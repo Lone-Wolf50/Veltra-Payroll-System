@@ -12,12 +12,17 @@ import {
   getAnomalies,
   getEmployeeEwaStatus,
   getAttendanceRecords,
+  getEmployees,
+  getAuditTrail,
+  getOvertimeByDepartment,
+  getSystemRules,
 } from "@/lib/data";
-import { formatGHS, formatDate } from "@/lib/format";
+import { formatGHS, formatDate, formatDateTime } from "@/lib/format";
 import { StatusPill } from "@/components/ui/status-pill";
 import { LiveDateTimeBadge } from "@/components/ui/live-datetime";
 import { PayrollCostChart } from "@/components/charts/payroll-cost-chart";
 import { PayrollStatusChart } from "@/components/charts/payroll-status-chart";
+import { OvertimeByDepartmentChart } from "@/components/charts/secondary-charts";
 import { PayrollRecordsTable } from "@/components/tables/payroll-table";
 import {
   Wallet,
@@ -30,6 +35,10 @@ import {
   CalendarClock,
   SlidersHorizontal,
   CheckCircle2,
+  FileSignature,
+  FolderCheck,
+  Shield,
+  UsersRound,
 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -50,8 +59,7 @@ export default function DashboardPage() {
     [storeTick]
   );
 
-  // If the signed-in user is an Employee, show their role-tailored summary banner at top
-  // while also allowing inspection of the Employee home metrics (PRD Section 4)
+  // 1. EMPLOYEE HOME DASHBOARD (PRD Section 4)
   if (user.role === "Employee") {
     const ewaStatus = getEmployeeEwaStatus(user.employeeId);
     const myAttendance = getAttendanceRecords(user.employeeId);
@@ -81,7 +89,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Employee 3 summary cards (PRD Section 4: Today's clock-in, attendance this period, EWA available) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="veltra-card p-5">
             <div className="flex items-center justify-between gap-2">
@@ -155,6 +162,280 @@ export default function DashboardPage() {
     );
   }
 
+  // 2. ADMIN HOME DASHBOARD (Contract Letters Issuing, Personnel Filing & System Rules — NO Payroll Access)
+  if (user.role === "Admin") {
+    const employees = getEmployees();
+    const auditEntries = getAuditTrail().slice(0, 4);
+    const incompleteFiles = employees.filter(
+      (e) => e.ssnitNumber === "MISSING" || e.ghanaCardNumber === "CONFLICT-ID"
+    ).length;
+
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h1 className="text-[28px] font-bold tracking-tight text-text leading-tight">
+                Admin & Contract Filing Dashboard
+              </h1>
+              <StatusPill status="Payroll Restricted (Confidential)" variant="violet" />
+            </div>
+            <p className="text-xs text-muted mt-1">
+              Sunda Ghana Limited · Issue contract letters, manage employee personnel files, and configure system rules.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <LiveDateTimeBadge />
+            <Link
+              href="/employees"
+              style={{ backgroundColor: "var(--primary)" }}
+              className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-95"
+            >
+              <FileSignature className="h-4 w-4" />
+              <span>Issue Contract Letters & Filing</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* Confidentiality Notice */}
+        <div
+          style={{
+            backgroundColor: "var(--primary-soft)",
+            color: "var(--primary)",
+          }}
+          className="rounded-card border border-border p-4 flex items-center gap-3 text-xs font-medium"
+        >
+          <Shield className="h-5 w-5 shrink-0" />
+          <span>
+            <strong>Strict Payroll Confidentiality Active:</strong> Admin accounts manage Contract Letters Issuing, Personnel Filing, User Roles, and System Rules. Access to Payroll Runs and employee salary figures is strictly limited to HR/Payroll and Finance.
+          </span>
+        </div>
+
+        {/* 3 Admin Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="veltra-card p-5 flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-muted">
+                Contract Letters & Personnel Files
+              </span>
+              <FileSignature className="h-4 w-4 text-primary" />
+            </div>
+            <div className="mt-3 text-2xl font-bold text-text tabular-nums">
+              {employees.length} Staff Files
+            </div>
+            <p className="mt-2 text-xs text-muted">
+              Appointment, Confirmation & Renewal letters ready to issue
+            </p>
+            <Link
+              href="/employees"
+              className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+            >
+              <span>Open Contract Issuing & Filing</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+
+          <div className="veltra-card p-5 flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-muted">
+                Incomplete Statutory Files (Ghana Card / SSNIT)
+              </span>
+              <FolderCheck className="h-4 w-4 text-status-amber-fg" />
+            </div>
+            <div className="mt-3 text-2xl font-bold text-text tabular-nums">
+              {incompleteFiles} Files Need Filing
+            </div>
+            <p className="mt-2 text-xs text-muted">
+              Missing SSNIT or Ghana Card ID on personnel dossier
+            </p>
+            <Link
+              href="/employees"
+              className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+            >
+              <span>Review personnel dossiers</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+
+          <div className="veltra-card p-5 flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-muted">
+                Configurable System Rules & Users
+              </span>
+              <SlidersHorizontal className="h-4 w-4 text-teal" />
+            </div>
+            <div className="mt-3 text-2xl font-bold text-text tabular-nums">
+              5 Active Roles
+            </div>
+            <p className="mt-2 text-xs text-muted">
+              Approval stages, overtime thresholds & EWA limits
+            </p>
+            <Link
+              href="/settings"
+              className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+            >
+              <span>Manage Settings & Rules</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        </div>
+
+        {/* Recent Audit Trail Preview */}
+        <div className="veltra-card p-5 space-y-3">
+          <div className="flex items-center justify-between border-b border-border pb-3">
+            <div>
+              <h2 className="text-base font-bold text-text">
+                Recent System Audit Trail
+              </h2>
+              <p className="text-xs text-muted">
+                Chronological log of system changes and role actions
+              </p>
+            </div>
+            <Link
+              href="/audit"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+            >
+              <span>View Full Audit Trail</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+          <div className="divide-y divide-border text-xs">
+            {auditEntries.map((entry) => (
+              <div
+                key={entry.id}
+                className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+              >
+                <div>
+                  <span className="font-bold text-text">{entry.action}</span>
+                  <p className="text-muted mt-0.5">{entry.details}</p>
+                </div>
+                <div className="text-muted shrink-0 tabular-nums">
+                  {entry.actorName} ({entry.actorRole}) ·{" "}
+                  {formatDateTime(entry.timestamp)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. SUPERVISOR HOME DASHBOARD (Team Attendance & Stage 1 Approvals — NO Salary Register)
+  if (user.role === "Supervisor") {
+    const overtimeData = getOvertimeByDepartment();
+    const rules = getSystemRules();
+    const teamLogs = getAttendanceRecords();
+
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h1 className="text-[28px] font-bold tracking-tight text-text leading-tight">
+                Supervisor Team & Approval Dashboard
+              </h1>
+              <StatusPill status="Stage 1 Approver" variant="green" />
+            </div>
+            <p className="text-xs text-muted mt-1">
+              {user.department} · Verify shift attendance logs, monitor department overtime, and complete Stage 1 payroll sign-off.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <LiveDateTimeBadge />
+            <Link
+              href="/approvals"
+              style={{ backgroundColor: "var(--primary)" }}
+              className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-95"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              <span>Open Stage 1 Approvals</span>
+            </Link>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="veltra-card p-5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-muted">
+                Team Shift Attendance Today
+              </span>
+              <UsersRound className="h-4 w-4 text-primary" />
+            </div>
+            <div className="mt-3 text-2xl font-bold text-text tabular-nums">
+              {teamLogs.length} Active Logs
+            </div>
+            <p className="mt-2 text-xs text-muted">
+              Manufacturing & Assembly biometric records synced
+            </p>
+            <Link
+              href="/team-attendance"
+              className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+            >
+              <span>Inspect Team Attendance</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+
+          <div className="veltra-card p-5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-muted">
+                Department Overtime Threshold
+              </span>
+              <Clock className="h-4 w-4 text-status-amber-fg" />
+            </div>
+            <div className="mt-3 text-2xl font-bold text-text tabular-nums">
+              48 hrs{" "}
+              <span className="text-sm font-medium text-muted">
+                / {rules.anomalyRules.abnormal_overtime.maxHoursPerPeriod}h limit
+              </span>
+            </div>
+            <p className="mt-2 text-xs text-muted">
+              Manufacturing is +8 hrs above normal period threshold
+            </p>
+            <Link
+              href="/team-attendance"
+              className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+            >
+              <span>Review overtime chart</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+
+          <div className="veltra-card p-5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-muted">
+                Stage 1 Approval Queue
+              </span>
+              <CheckCircle2 className="h-4 w-4 text-teal" />
+            </div>
+            <div className="mt-3 text-2xl font-bold text-text tabular-nums">
+              Nov 2026 Verified
+            </div>
+            <p className="mt-2 text-xs text-muted">
+              Stage 1 approved by Kofi Owusu on 02 Nov 2026
+            </p>
+            <Link
+              href="/approvals"
+              className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+            >
+              <span>Go to Approvals Stepper</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        </div>
+
+        <OvertimeByDepartmentChart
+          data={overtimeData}
+          threshold={rules.anomalyRules.abnormal_overtime.maxHoursPerPeriod}
+        />
+      </div>
+    );
+  }
+
+  // 4. HR/PAYROLL & FINANCE DASHBOARD (Full Payroll Register & Statutory Breakdown)
   return (
     <div className="space-y-6">
       {/* Page Title & Actions */}
@@ -162,7 +443,9 @@ export default function DashboardPage() {
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
             <h1 className="text-[28px] font-bold tracking-tight text-text leading-tight">
-              HR & Payroll Dashboard
+              {user.role === "Finance"
+                ? "Finance & Payroll Verification Dashboard"
+                : "HR & Payroll Dashboard"}
             </h1>
             <StatusPill status={summary.currentRun.status} />
           </div>
@@ -226,17 +509,21 @@ export default function DashboardPage() {
           </div>
 
           <Link
-            href="/payroll"
+            href={user.role === "Finance" ? "/approvals" : "/payroll"}
             style={{ backgroundColor: "var(--primary)" }}
             className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
-            <span>Open Payroll Run</span>
+            <span>
+              {user.role === "Finance"
+                ? "Open Final Approvals"
+                : "Open Payroll Run"}
+            </span>
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
       </div>
 
-      {/* Near-Deadline Banner (PRD Section 7.2 & 11.2: "A banner when a payroll deadline is near, with a link to the open run") */}
+      {/* Near-Deadline Banner */}
       <div
         style={{
           backgroundColor: "var(--status-amber-bg)",
@@ -272,9 +559,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 4 Summary Cards (PRD Section 7.2: Total payroll cost, Net pay, Statutory deductions, Flagged records) */}
+      {/* 4 Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-        {/* Card 1: Total Payroll Cost */}
         <div className="veltra-card p-5 flex flex-col justify-between">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold text-muted">
@@ -308,7 +594,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Card 2: Net Pay */}
         <div className="veltra-card p-5 flex flex-col justify-between">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold text-muted">
@@ -342,7 +627,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Card 3: Statutory Deductions */}
         <div className="veltra-card p-5 flex flex-col justify-between">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold text-muted">
@@ -375,7 +659,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Card 4: Flagged Records */}
         <div className="veltra-card p-5 flex flex-col justify-between">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold text-muted">
@@ -425,7 +708,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Two Headline Charts: Payroll Cost by Month (Stacked Columns) & Payroll Status (Donut) */}
+      {/* Two Headline Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-7">
           <PayrollCostChart
@@ -443,7 +726,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Searchable, Filterable, Paginated, Exportable Payroll Register Table */}
+      {/* Payroll Register Table (Visible ONLY to HR/Payroll and Finance) */}
       <PayrollRecordsTable
         records={records}
         periodLabel={summary.currentRun.periodLabel}

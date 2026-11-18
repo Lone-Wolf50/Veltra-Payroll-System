@@ -70,7 +70,7 @@ export const NAVIGATION_ITEMS: NavItemConfig[] = [
       Supervisor: "none",
       "HR/Payroll": "yes",
       Finance: "view",
-      Admin: "view",
+      Admin: "none",
     },
   },
   {
@@ -83,7 +83,7 @@ export const NAVIGATION_ITEMS: NavItemConfig[] = [
       Supervisor: "none",
       "HR/Payroll": "yes",
       Finance: "view",
-      Admin: "view",
+      Admin: "none",
     },
   },
   {
@@ -122,12 +122,12 @@ export const NAVIGATION_ITEMS: NavItemConfig[] = [
       Supervisor: "none",
       "HR/Payroll": "recover",
       Finance: "view",
-      Admin: "settings",
+      Admin: "none",
     },
   },
   {
     id: "employees",
-    label: "Employees",
+    label: "Employees & Filing",
     href: "/employees",
     icon: "UserCheck",
     permissions: {
@@ -148,7 +148,7 @@ export const NAVIGATION_ITEMS: NavItemConfig[] = [
       Supervisor: "none",
       "HR/Payroll": "yes",
       Finance: "yes",
-      Admin: "yes",
+      Admin: "none",
     },
   },
   {
@@ -212,7 +212,7 @@ export const ROLE_DESCRIPTIONS: Record<Role, { title: string; summary: string }>
     summary: "Final approval, payment verification, and EWA advance recovery tracking",
   },
   Admin: {
-    title: "System Admin",
-    summary: "Manage users, roles, anomaly thresholds, statutory rules, and EWA limits",
+    title: "System & HR Admin",
+    summary: "Issue contract letters, manage employee filing, users, roles, and system settings (no payroll access)",
   },
 };
