@@ -149,9 +149,10 @@ export function calculateSundaExcelPayroll(params: {
 
   const basicEarnedCedis = basicStdCedis * (paidDays / shouldDays);
   const positionEarnedCedis = positionStdCedis;
-  const coeff = params.coefficientScore ?? 0;
+  const coeff = params.coefficientScore ?? 1.0;
+  // Performance Earned = Performance STD * Coefficient Score (e.g. 1,446 * 1.5 = 2,169.00)
   const performanceEarnedCedis =
-    Math.round(performanceStdCedis * (coeff / 100) * 100) / 100;
+    Math.round(performanceStdCedis * coeff * 100) / 100;
 
   const otherIncomeCedis = (params.otherIncomePesewas ?? 0) / 100;
   const fullAttendanceCedis = (params.fullAttendanceBonusPesewas ?? 0) / 100;

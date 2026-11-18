@@ -530,53 +530,74 @@ export function PayrollRecordsTable({
             )}
 
             <div className="mt-4 space-y-3 text-xs tabular-nums max-h-[70vh] overflow-y-auto pr-1">
-              {/* 1. Wage Standards & Working Days (From Excel Formula Sheet) */}
+              {/* 1. Wage Standards & Working Days */}
               <div className="rounded-lg bg-page p-3 border border-border space-y-1.5">
                 <div className="font-semibold text-text mb-1 flex items-center justify-between">
                   <span>
-                    1. Standards & Attendance ({selectedRecord.daysAttended}/
+                    1. Wage Standards & Rates ({selectedRecord.daysAttended}/
                     {selectedRecord.daysExpected} actual · {selectedRecord.daysPaid} paid days)
                   </span>
-                  {selectedRecord.coefficientScore !== undefined && (
-                    <span className="text-[11px] text-primary font-bold">
-                      Co. Score: {selectedRecord.coefficientScore}
-                    </span>
-                  )}
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted">
-                    Basic Wage STD (Daily:{" "}
-                    {formatGHS(
-                      selectedRecord.dailyWageStdPesewas ??
-                        Math.round(selectedRecord.basicSalaryPesewas / 20)
-                    )}{" "}
-                    · Hourly:{" "}
-                    {formatGHS(
-                      selectedRecord.hourlyWageStdPesewas ??
-                        Math.round(selectedRecord.basicSalaryPesewas / 160)
-                    )}
-                    ):
-                  </span>
+                  <span className="text-muted">Basic Wage STD:</span>
                   <span className="font-semibold text-text">
                     {formatGHS(selectedRecord.basicSalaryPesewas)}
                   </span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-muted">
+                    Daily Wage STD (Basic ÷ {selectedRecord.daysExpected} days):
+                  </span>
+                  <span className="font-semibold text-text">
+                    {formatGHS(
+                      selectedRecord.dailyWageStdPesewas ??
+                        Math.round(selectedRecord.basicSalaryPesewas / 20)
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted">
+                    Hourly Wage STD (Daily ÷ 8 hrs):
+                  </span>
+                  <span className="font-bold text-primary">
+                    {formatGHS(
+                      selectedRecord.hourlyWageStdPesewas ??
+                        Math.round(selectedRecord.basicSalaryPesewas / 160)
+                    )}
+                    /hr
+                  </span>
+                </div>
                 {(selectedRecord.positionStdPesewas ?? 0) > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-muted">
-                      Position STD ({formatGHS(selectedRecord.positionStdPesewas ?? 0)}) + Performance STD ({formatGHS(selectedRecord.performanceStdPesewas ?? 0)}):
-                    </span>
-                    <span className="font-semibold text-text">
-                      Total STD {formatGHS(selectedRecord.totalGrossStdPesewas ?? selectedRecord.basicSalaryPesewas)}
-                    </span>
-                  </div>
+                  <>
+                    <div className="flex justify-between pt-1 border-t border-border/60">
+                      <span className="text-muted">Position STD:</span>
+                      <span className="font-semibold text-text">
+                        {formatGHS(selectedRecord.positionStdPesewas ?? 0)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted">Performance STD:</span>
+                      <span className="font-semibold text-text">
+                        {formatGHS(selectedRecord.performanceStdPesewas ?? 0)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between font-bold text-text">
+                      <span>Total Gross STD (Basic + Position + Performance):</span>
+                      <span>
+                        {formatGHS(
+                          selectedRecord.totalGrossStdPesewas ??
+                            selectedRecord.basicSalaryPesewas
+                        )}
+                      </span>
+                    </div>
+                  </>
                 )}
               </div>
 
-              {/* 2. Earned Wages, Total Bonus & 4-Tier Overtime */}
+              {/* 2. Earned Wages & Bonus Breakdown */}
               <div className="rounded-lg bg-page p-3 border border-border space-y-1.5">
                 <div className="font-semibold text-text mb-1">
-                  2. Earned Wages, Bonus & Multi-Rate Overtime
+                  2. Earned Wages & Bonus Breakdown
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted">Basic Wage Earned:</span>
@@ -586,52 +607,109 @@ export function PayrollRecordsTable({
                 </div>
                 {(selectedRecord.positionEarnedPesewas ?? 0) > 0 && (
                   <div className="flex justify-between">
-                    <span className="text-muted">
-                      Position Earned + Performance Earned (Co. {selectedRecord.coefficientScore}):
-                    </span>
+                    <span className="text-muted">Position Earned:</span>
                     <span className="font-semibold text-text">
-                      {formatGHS(
-                        (selectedRecord.positionEarnedPesewas ?? 0) +
-                          (selectedRecord.performanceEarnedPesewas ?? 0)
-                      )}
+                      {formatGHS(selectedRecord.positionEarnedPesewas ?? 0)}
                     </span>
                   </div>
                 )}
-                {(selectedRecord.otherIncomePesewas ?? 0) +
-                  (selectedRecord.fullAttendanceBonusPesewas ?? 0) +
-                  (selectedRecord.lunchAllowancePesewas ?? 0) >
-                  0 && (
+                {(selectedRecord.performanceStdPesewas ?? 0) > 0 && (
                   <div className="flex justify-between">
                     <span className="text-muted">
-                      Other Income ({formatGHS(selectedRecord.otherIncomePesewas ?? 0)}) + Full Att. ({formatGHS(selectedRecord.fullAttendanceBonusPesewas ?? 0)}) + Lunch ({formatGHS(selectedRecord.lunchAllowancePesewas ?? 0)}):
+                      Performance Earned ({formatGHS(selectedRecord.performanceStdPesewas ?? 0)} ×{" "}
+                      {selectedRecord.coefficientScore} Co. Score):
+                    </span>
+                    <span className="font-semibold text-text">
+                      {formatGHS(selectedRecord.performanceEarnedPesewas ?? 0)}
+                    </span>
+                  </div>
+                )}
+                {(selectedRecord.otherIncomePesewas ?? 0) > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted">Other Income (Before Tax):</span>
+                    <span className="font-semibold text-text">
+                      {formatGHS(selectedRecord.otherIncomePesewas ?? 0)}
+                    </span>
+                  </div>
+                )}
+                {((selectedRecord.fullAttendanceBonusPesewas ?? 0) > 0 ||
+                  (selectedRecord.lunchAllowancePesewas ?? 0) > 0) && (
+                  <div className="flex justify-between">
+                    <span className="text-muted">
+                      Full Attendance ({formatGHS(selectedRecord.fullAttendanceBonusPesewas ?? 0)}) + Lunch Allowance ({formatGHS(selectedRecord.lunchAllowancePesewas ?? 0)}):
                     </span>
                     <span className="font-semibold text-text">
                       {formatGHS(
-                        (selectedRecord.otherIncomePesewas ?? 0) +
-                          (selectedRecord.fullAttendanceBonusPesewas ?? 0) +
+                        (selectedRecord.fullAttendanceBonusPesewas ?? 0) +
                           (selectedRecord.lunchAllowancePesewas ?? 0)
                       )}
                     </span>
                   </div>
                 )}
-                <div className="flex justify-between">
-                  <span className="text-muted">Total Bonus & Allowances:</span>
-                  <span className="font-semibold text-text">
-                    {formatGHS(selectedRecord.allowancesPesewas)}
+                <div className="flex justify-between pt-1 border-t border-border font-bold text-text">
+                  <span>Total Bonus & Allowances:</span>
+                  <span>{formatGHS(selectedRecord.allowancesPesewas)}</span>
+                </div>
+              </div>
+
+              {/* 3. Step-by-Step Overtime Calculation (OT Hours * Hourly Wage * Rate) */}
+              <div className="rounded-lg bg-page p-3 border border-border space-y-1.5">
+                <div className="font-semibold text-text mb-1 flex items-center justify-between">
+                  <span>3. Overtime Calculation (OT Hours × Hourly Wage × Rate)</span>
+                  <span className="text-[11px] font-bold text-primary">
+                    Hourly Wage:{" "}
+                    {formatGHS(
+                      selectedRecord.hourlyWageStdPesewas ??
+                        Math.round(selectedRecord.basicSalaryPesewas / 160)
+                    )}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted">
-                    Total Overtime Salary ({selectedRecord.overtimeHours} hrs — WD 1.2x:{" "}
-                    {selectedRecord.workdayOtHours ?? 0}h, Sat 1.5x:{" "}
-                    {selectedRecord.saturdayOtHours ?? 0}h, Sun 2.0x:{" "}
-                    {selectedRecord.sundayOtHours ?? 0}h):
+                    Workday OT ({selectedRecord.workdayOtHours ?? 0} hrs ×{" "}
+                    {formatGHS(
+                      selectedRecord.hourlyWageStdPesewas ??
+                        Math.round(selectedRecord.basicSalaryPesewas / 160)
+                    )}{" "}
+                    × 1.2):
                   </span>
                   <span className="font-semibold text-text">
-                    {formatGHS(selectedRecord.overtimePayPesewas)}
+                    {formatGHS(selectedRecord.workdayOtPayPesewas ?? 0)}
                   </span>
                 </div>
-                <div className="flex justify-between pt-1.5 border-t border-border font-bold text-text">
+                <div className="flex justify-between">
+                  <span className="text-muted">
+                    Saturday OT ({selectedRecord.saturdayOtHours ?? 0} hrs ×{" "}
+                    {formatGHS(
+                      selectedRecord.hourlyWageStdPesewas ??
+                        Math.round(selectedRecord.basicSalaryPesewas / 160)
+                    )}{" "}
+                    × 1.5):
+                  </span>
+                  <span className="font-semibold text-text">
+                    {formatGHS(selectedRecord.saturdayOtPayPesewas ?? 0)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted">
+                    Sunday OT ({selectedRecord.sundayOtHours ?? 0} hrs ×{" "}
+                    {formatGHS(
+                      selectedRecord.hourlyWageStdPesewas ??
+                        Math.round(selectedRecord.basicSalaryPesewas / 160)
+                    )}{" "}
+                    × 2.0):
+                  </span>
+                  <span className="font-semibold text-text">
+                    {formatGHS(selectedRecord.sundayOtPayPesewas ?? 0)}
+                  </span>
+                </div>
+                <div className="flex justify-between pt-1 border-t border-border font-bold text-text">
+                  <span>
+                    Total Overtime Salary ({selectedRecord.overtimeHours} hrs total):
+                  </span>
+                  <span>{formatGHS(selectedRecord.overtimePayPesewas)}</span>
+                </div>
+                <div className="flex justify-between pt-1.5 border-t border-border font-bold text-text text-sm">
                   <span>Gross Salary (Basic + Total Bonus + Total OT):</span>
                   <span>{formatGHS(selectedRecord.grossPayPesewas)}</span>
                 </div>
