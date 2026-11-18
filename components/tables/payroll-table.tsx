@@ -559,10 +559,10 @@ export function PayrollRecordsTable({
                 </div>
               </div>
 
-              {/* 2. Earned Wages & Bonus Breakdown */}
+              {/* 2. Earned Wages & Allowance */}
               <div className="rounded-lg bg-page p-3 border border-border space-y-1.5">
                 <div className="font-semibold text-text mb-1">
-                  2. Earned Wages & Allowances / Bonus
+                  2. Earned Wages & Allowance
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted">Basic Wage Earned:</span>
@@ -570,9 +570,50 @@ export function PayrollRecordsTable({
                     {formatGHS(selectedRecord.basicSalaryPesewas)}
                   </span>
                 </div>
-                <div className="flex justify-between pt-1 border-t border-border font-bold text-text">
-                  <span>Allowances & Bonus (Before Tax):</span>
-                  <span>{formatGHS(selectedRecord.allowancesPesewas)}</span>
+                {(selectedRecord.otherIncomePesewas ?? 0) > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted">Other Income (Before Tax):</span>
+                    <span className="font-semibold text-text">
+                      {formatGHS(selectedRecord.otherIncomePesewas ?? 0)}
+                    </span>
+                  </div>
+                )}
+                {((selectedRecord.fullAttendanceBonusPesewas ?? 0) > 0 ||
+                  (selectedRecord.lunchAllowancePesewas ?? 0) > 0) && (
+                  <div className="flex justify-between">
+                    <span className="text-muted">
+                      Full Attendance ({formatGHS(selectedRecord.fullAttendanceBonusPesewas ?? 0)}) + Lunch Allowance ({formatGHS(selectedRecord.lunchAllowancePesewas ?? 0)}):
+                    </span>
+                    <span className="font-semibold text-text">
+                      {formatGHS(
+                        (selectedRecord.fullAttendanceBonusPesewas ?? 0) +
+                          (selectedRecord.lunchAllowancePesewas ?? 0)
+                      )}
+                    </span>
+                  </div>
+                )}
+                {selectedRecord.allowancesPesewas > 0 &&
+                  (selectedRecord.otherIncomePesewas ?? 0) +
+                    (selectedRecord.fullAttendanceBonusPesewas ?? 0) +
+                    (selectedRecord.lunchAllowancePesewas ?? 0) ===
+                    0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted">Allowances & Bonus:</span>
+                      <span className="font-semibold text-text">
+                        {formatGHS(selectedRecord.allowancesPesewas)}
+                      </span>
+                    </div>
+                  )}
+                <div className="flex justify-between pt-1.5 border-t border-border font-bold text-text">
+                  <span>
+                    Total Earned Wages & Allowance (Basic + Allowances):
+                  </span>
+                  <span>
+                    {formatGHS(
+                      selectedRecord.basicSalaryPesewas +
+                        selectedRecord.allowancesPesewas
+                    )}
+                  </span>
                 </div>
               </div>
 
@@ -634,7 +675,9 @@ export function PayrollRecordsTable({
                   <span>{formatGHS(selectedRecord.overtimePayPesewas)}</span>
                 </div>
                 <div className="flex justify-between pt-1.5 border-t border-border font-bold text-text text-sm">
-                  <span>Gross Salary (Basic + Allowances/Bonus + Total OT):</span>
+                  <span>
+                    Gross Salary (Total Earned Wages & Allowance + Total OT):
+                  </span>
                   <span>{formatGHS(selectedRecord.grossPayPesewas)}</span>
                 </div>
               </div>
