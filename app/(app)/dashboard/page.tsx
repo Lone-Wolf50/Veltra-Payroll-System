@@ -37,7 +37,6 @@ import {
   CheckCircle2,
   FileSignature,
   FolderCheck,
-  Shield,
   UsersRound,
 } from "lucide-react";
 
@@ -76,7 +75,7 @@ export default function DashboardPage() {
               {user.department} · Staff ID: SGL-1002 · Period: November 2026
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 sm:shrink-0">
             <LiveDateTimeBadge />
             <Link
               href="/attendance"
@@ -176,16 +175,15 @@ export default function DashboardPage() {
           <div>
             <div className="flex items-center gap-2.5 flex-wrap">
               <h1 className="text-[28px] font-bold tracking-tight text-text leading-tight">
-                Admin & Contract Filing Dashboard
+                Administration Dashboard
               </h1>
-              <StatusPill status="Payroll Restricted (Confidential)" variant="violet" />
             </div>
             <p className="text-xs text-muted mt-1">
               Sunda Ghana Limited · Issue contract letters, manage employee personnel files, and configure system rules.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 sm:shrink-0">
             <LiveDateTimeBadge />
             <Link
               href="/employees"
@@ -193,23 +191,9 @@ export default function DashboardPage() {
               className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-95"
             >
               <FileSignature className="h-4 w-4" />
-              <span>Issue Contract Letters & Filing</span>
+              <span className="whitespace-nowrap">Contract Letters & Filing</span>
             </Link>
           </div>
-        </div>
-
-        {/* Confidentiality Notice */}
-        <div
-          style={{
-            backgroundColor: "var(--primary-soft)",
-            color: "var(--primary)",
-          }}
-          className="rounded-card border border-border p-4 flex items-center gap-3 text-xs font-medium"
-        >
-          <Shield className="h-5 w-5 shrink-0" />
-          <span>
-            <strong>Strict Payroll Confidentiality Active:</strong> Admin accounts manage Contract Letters Issuing, Personnel Filing, User Roles, and System Rules. Access to Payroll Runs and employee salary figures is strictly limited to HR/Payroll and Finance.
-          </span>
         </div>
 
         {/* 3 Admin Summary Cards */}
@@ -334,16 +318,15 @@ export default function DashboardPage() {
           <div>
             <div className="flex items-center gap-2.5 flex-wrap">
               <h1 className="text-[28px] font-bold tracking-tight text-text leading-tight">
-                Supervisor Team & Approval Dashboard
+                Supervisor Dashboard
               </h1>
-              <StatusPill status="Stage 1 Approver" variant="green" />
             </div>
             <p className="text-xs text-muted mt-1">
               {user.department} · Verify shift attendance logs, monitor department overtime, and complete Stage 1 payroll sign-off.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 sm:shrink-0">
             <LiveDateTimeBadge />
             <Link
               href="/approvals"
@@ -351,7 +334,7 @@ export default function DashboardPage() {
               className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-95"
             >
               <CheckCircle2 className="h-4 w-4" />
-              <span>Open Stage 1 Approvals</span>
+              <span className="whitespace-nowrap">Review Approvals</span>
             </Link>
           </div>
         </div>
@@ -456,7 +439,7 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 sm:shrink-0">
           {/* Live Date & Time on Dashboard */}
           <LiveDateTimeBadge />
 

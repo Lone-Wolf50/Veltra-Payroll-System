@@ -28,7 +28,7 @@ export function LiveDateTimeBadge() {
   }, []);
 
   return (
-    <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-text tabular-nums">
+    <div className="inline-flex items-center gap-2 whitespace-nowrap shrink-0 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-text tabular-nums">
       <Clock className="h-3.5 w-3.5 text-primary shrink-0" />
       <span>{dateTimeText}</span>
     </div>
