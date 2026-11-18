@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --page: #F4F5F7;
+    --surface: #FFFFFF;
+    --border: #E5E7EB;
+    --text: #1F2430;
+    --muted: #6B7280;
+    --primary: #6C4DF6;
+    --primary-soft: #E9E5FF;
+    --teal: #2FB7A6;
+    --blue-soft: #DCE8FF;
+    --status-green-fg: #17784B;
+    --status-green-bg: #E3F6EC;
+    --status-amber-fg: #8A5A00;
+    --status-amber-bg: #FFF4D6;
+    --status-red-fg: #B42B2B;
+    --status-red-bg: #FDE8E8;
+  }
+
+  .dark {
+    --page: #0F1117;
+    --surface: #181B24;
+    --border: #2A2F3B;
+    --text: #E8EAF0;
+    --muted: #9AA3B2;
+    --primary: #8B73FF;
+    --primary-soft: #2A2450;
+    --teal: #3CCDBB;
+    --blue-soft: #1E2F52;
+    --status-green-fg: #6EDBA5;
+    --status-green-bg: #12301F;
+    --status-amber-fg: #F5C76B;
+    --status-amber-bg: #3A2D0B;
+    --status-red-fg: #FF9B9B;
+    --status-red-bg: #3F1717;
+  }
+
+  body {
+    background-color: var(--page);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Card surface helper matching PRD 5.2:
+   12px radius, 1px border, very light shadow in light mode, border only in dark mode */
+.veltra-card {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px 0 rgba(16, 24, 40, 0.04);
+}
+
+.dark .veltra-card {
+  box-shadow: none;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+  }
+}
