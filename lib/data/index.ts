@@ -63,6 +63,7 @@ const INITIAL_EMAIL_LOGS: EmailLogEntry[] = [
     id: "eml-001",
     type: "Bulk",
     subject: "October 2026 Payslips Now Available",
+    title: "October 2026 Statutory Payslip Notice",
     body: "Dear Staff,\n\nYour October 2026 statutory payslip has been published and is available for download in the Veltra Payroll portal.\n\nRegards,\nHR & Payroll — Sunda Ghana Limited",
     recipientSummary: "All Active Staff (58 recipients)",
     recipientCount: 58,
@@ -78,6 +79,7 @@ const INITIAL_EMAIL_LOGS: EmailLogEntry[] = [
     id: "eml-002",
     type: "Individual",
     subject: "Action Required: SSNIT Number Verification",
+    title: "Statutory Record Verification Request",
     body: "Dear Kwame Osei,\n\nPlease submit a copy of your SSNIT card to the HR/Payroll office before the November 2026 payroll cutoff so your statutory filing remains up to date.\n\nRegards,\nHR & Payroll — Sunda Ghana Limited",
     recipientSummary: "Kwame Osei (SGL-1002)",
     recipientCount: 1,
@@ -185,6 +187,145 @@ export function getEmployees(): Employee[] {
 
 export function getEmployeeById(id: string): Employee | undefined {
   return store.employees.find((e) => e.id === id);
+}
+
+export function addEmployee(params: {
+  employee: Omit<Employee, "id" | "fullName">;
+  actorName: string;
+  actorRole: Role;
+}): { ok: boolean; employee?: Employee; error?: string } {
+  const staffIdClean = params.employee.staffId.trim();
+  if (!staffIdClean) {
+    return { ok: false, error: "Staff ID is required." };
+  }
+  const duplicate = store.employees.some(
+    (e) => e.staffId.toLowerCase() === staffIdClean.toLowerCase()
+  );
+  if (duplicate) {
+    return {
+      ok: false,
+      error: `Staff ID "${staffIdClean}" already exists in the employee directory.`,
+    };
+  }
+
+  const firstName = params.employee.firstName.trim();
+  const lastName = params.employee.lastName.trim();
+  const fullName = `${firstName} ${lastName}`.trim();
+
+  const created: Employee = {
+    ...params.employee,
+    id: `emp-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    staffId: staffIdClean,
+    firstName,
+    lastName,
+    fullName,
+  };
+
+  store.employees = [created, ...store.employees];
+
+  store.auditTrail.unshift({
+    id: `aud-${Date.now()}`,
+    timestamp: new Date().toISOString(),
+    actorName: params.actorName,
+    actorRole: params.actorRole,
+    category: "Payroll",
+    action: "Added New Employee",
+    details: `Uploaded ${created.fullName} (${created.staffId}) in ${created.department} · Basic Wage STD GHS ${(
+      created.basicSalaryPesewas / 100
+    ).toFixed(2)} · Bank: ${created.bankName}.`,
+  });
+
+  notify();
+  return { ok: true, employee: created };
+}
+
+export function bulkAddEmployees(params: {
+  employees: Omit<Employee, "id" | "fullName">[];
+  actorName: string;
+  actorRole: Role;
+}): { added: Employee[]; skipped: { staffId: string; reason: string }[] } {
+  const existingIds = new Set(
+    store.employees.map((e) => e.staffId.toLowerCase())
+  );
+  const added: Employee[] = [];
+  const skipped: { staffId: string; reason: string }[] = [];
+  const baseTs = Date.now();
+
+  params.employees.forEach((emp, i) => {
+    const staffIdClean = emp.staffId.trim();
+    if (!staffIdClean) {
+      skipped.push({ staffId: "(blank)", reason: "Missing Staff ID" });
+      return;
+    }
+    if (existingIds.has(staffIdClean.toLowerCase())) {
+      skipped.push({ staffId: staffIdClean, reason: "Duplicate Staff ID" });
+      return;
+    }
+    const firstName = emp.firstName.trim();
+    const lastName = emp.lastName.trim();
+    if (!firstName || !lastName) {
+      skipped.push({ staffId: staffIdClean, reason: "Missing first or last name" });
+      return;
+    }
+    existingIds.add(staffIdClean.toLowerCase());
+    added.push({
+      ...emp,
+      id: `emp-${baseTs}-${i}`,
+      staffId: staffIdClean,
+      firstName,
+      lastName,
+      fullName: `${firstName} ${lastName}`.trim(),
+    });
+  });
+
+  if (added.length > 0) {
+    store.employees = [...added, ...store.employees];
+    store.auditTrail.unshift({
+      id: `aud-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      actorName: params.actorName,
+      actorRole: params.actorRole,
+      category: "Payroll",
+      action: `Bulk Uploaded ${added.length} New Employee${added.length === 1 ? "" : "s"}`,
+      details: `Imported ${added.length} employee record${
+        added.length === 1 ? "" : "s"
+      } via CSV (${added
+        .slice(0, 3)
+        .map((e) => e.staffId)
+        .join(", ")}${added.length > 3 ? ` +${added.length - 3} more` : ""})${
+        skipped.length > 0 ? `. Skipped ${skipped.length} invalid/duplicate row(s).` : "."
+      }`,
+    });
+    notify();
+  }
+
+  return { added, skipped };
+}
+
+export function removeEmployee(params: {
+  employeeId: string;
+  actorName: string;
+  actorRole: Role;
+}): { ok: boolean; removed?: Employee; error?: string } {
+  const target = store.employees.find((e) => e.id === params.employeeId);
+  if (!target) {
+    return { ok: false, error: "Employee not found." };
+  }
+
+  store.employees = store.employees.filter((e) => e.id !== params.employeeId);
+
+  store.auditTrail.unshift({
+    id: `aud-${Date.now()}`,
+    timestamp: new Date().toISOString(),
+    actorName: params.actorName,
+    actorRole: params.actorRole,
+    category: "Payroll",
+    action: "Removed Employee",
+    details: `Removed ${target.fullName} (${target.staffId}) from ${target.department} in the employee directory.`,
+  });
+
+  notify();
+  return { ok: true, removed: target };
 }
 
 // --- Payroll Runs & Records ---
@@ -885,6 +1026,7 @@ export function getEmailLogs(): EmailLogEntry[] {
 export function sendHrPayrollEmail(params: {
   type: "Bulk" | "Individual";
   subject: string;
+  title?: string;
   body: string;
   recipientSummary: string;
   recipientEmails: string[];
@@ -897,6 +1039,7 @@ export function sendHrPayrollEmail(params: {
     id: `eml-${Date.now()}`,
     type: params.type,
     subject: params.subject.trim(),
+    title: params.title?.trim() || undefined,
     body: params.body.trim(),
     recipientSummary: params.recipientSummary,
     recipientCount: params.recipientEmails.length,

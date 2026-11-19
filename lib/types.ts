@@ -287,6 +287,7 @@ export interface EmailLogEntry {
   id: string;
   type: "Bulk" | "Individual";
   subject: string;
+  title?: string;
   body: string;
   recipientSummary: string;
   recipientCount: number;

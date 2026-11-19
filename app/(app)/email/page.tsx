@@ -25,6 +25,8 @@ import {
   EyeOff,
   ChevronDown,
   ChevronUp,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
 
 type EmailTab = "bulk" | "individual" | "history";
@@ -43,6 +45,7 @@ const BULK_TEMPLATES = [
     id: "payslip_ready",
     label: "Payslip Ready",
     subject: "November 2026 Payslip Now Available",
+    title: "November 2026 Statutory Payslip Notice",
     body: "Dear {{name}},\n\nYour November 2026 statutory payslip for Sunda Ghana Limited is now available in the Veltra Payroll portal.\n\nPlease log in to review your earnings, pre-tax deductions, GRA PAYE, and SSNIT breakdown.\n\nRegards,\nHR & Payroll — Sunda Ghana Limited",
     includePayslip: true,
   },
@@ -50,6 +53,7 @@ const BULK_TEMPLATES = [
     id: "cutoff_reminder",
     label: "Payroll Cutoff Reminder",
     subject: "Reminder: November 2026 Payroll Attendance & Adjustments Cutoff",
+    title: "Payroll Cycle Cutoff Reminder — November 2026",
     body: "Dear {{name}},\n\nThis is a reminder that attendance verification and payroll adjustment submissions for the {{period}} cycle close this Friday at 17:00 GMT.\n\nPlease ensure all overtime logs and deduction adjustments are submitted through your department supervisor.\n\nRegards,\nHR & Payroll — Sunda Ghana Limited",
     includePayslip: false,
   },
@@ -57,6 +61,7 @@ const BULK_TEMPLATES = [
     id: "statutory_update",
     label: "SSNIT / Ghana Card Update",
     subject: "Action Required: Statutory Record Verification (SSNIT & Ghana Card)",
+    title: "Statutory Compliance & Record Verification",
     body: "Dear {{name}},\n\nAs part of our GRA Act 1178 and SSNIT compliance audit for {{department}}, please verify that your SSNIT number and Ghana Card ID on file are accurate.\n\nContact the HR/Payroll office if any updates are required.\n\nRegards,\nHR & Payroll — Sunda Ghana Limited",
     includePayslip: false,
   },
@@ -64,6 +69,7 @@ const BULK_TEMPLATES = [
     id: "general",
     label: "General HR Notice",
     subject: "HR & Payroll Notice — Sunda Ghana Limited",
+    title: "Official HR & Payroll Announcement",
     body: "Dear {{name}},\n\n\n\nRegards,\nHR & Payroll — Sunda Ghana Limited",
     includePayslip: false,
   },
@@ -74,6 +80,7 @@ const INDIVIDUAL_TEMPLATES = [
     id: "ind_payslip",
     label: "Payslip Dispatch",
     subject: "Your November 2026 Payslip — Sunda Ghana Limited",
+    title: "November 2026 Individual Payslip Dispatch",
     body: "Dear {{name}} ({{staffId}}),\n\nPlease find attached your November 2026 payroll summary. You can also download the printable PDF version from the My Payslips section of the portal.\n\nIf you have any questions regarding your deductions or net pay, please reply to HR/Payroll.\n\nRegards,\nHR & Payroll — Sunda Ghana Limited",
     includePayslip: true,
   },
@@ -81,6 +88,7 @@ const INDIVIDUAL_TEMPLATES = [
     id: "ind_statutory",
     label: "Missing SSNIT / ID",
     subject: "Action Required: Update Your Statutory Details ({{staffId}})",
+    title: "Statutory Record Verification Request",
     body: "Dear {{name}},\n\nOur payroll compliance check flagged incomplete statutory details on your personnel file. Please provide a copy of your Ghana Card and SSNIT card to HR/Payroll before the next pay run.\n\nRegards,\nHR & Payroll — Sunda Ghana Limited",
     includePayslip: false,
   },
@@ -88,6 +96,7 @@ const INDIVIDUAL_TEMPLATES = [
     id: "ind_anomaly",
     label: "Payroll Clarification",
     subject: "Payroll Verification Required — November 2026 Cycle",
+    title: "Attendance & Payroll Verification Notice",
     body: "Dear {{name}},\n\nWe are reviewing your November 2026 payroll record ({{department}}) and need to confirm your shift attendance / overtime entries before final approval.\n\nPlease reach out to the HR/Payroll desk at your earliest convenience.\n\nRegards,\nHR & Payroll — Sunda Ghana Limited",
     includePayslip: false,
   },
@@ -95,6 +104,7 @@ const INDIVIDUAL_TEMPLATES = [
     id: "ind_ewa",
     label: "EWA Recovery Notice",
     subject: "Earned Wage Access (EWA) Payroll Recovery Notice",
+    title: "EWA Advance Payroll Recovery Confirmation",
     body: "Dear {{name}},\n\nThis is to confirm that your approved Earned Wage Access advance for the November 2026 cycle has been scheduled for automatic deduction on this month's payroll.\n\nRegards,\nHR & Payroll — Sunda Ghana Limited",
     includePayslip: false,
   },
@@ -119,6 +129,8 @@ export default function HrPayrollEmailPage() {
 
   const [activeTab, setActiveTab] = useState<EmailTab>("bulk");
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [errorFeedback, setErrorFeedback] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
 
   // Bulk email state
   const [bulkAudience, setBulkAudience] = useState<BulkAudience>("all_active");
@@ -127,7 +139,9 @@ export default function HrPayrollEmailPage() {
   );
   const [customSearch, setCustomSearch] = useState("");
   const [customSelectedIds, setCustomSelectedIds] = useState<string[]>([]);
+  const [bulkTestEmails, setBulkTestEmails] = useState("");
   const [bulkSubject, setBulkSubject] = useState(BULK_TEMPLATES[0].subject);
+  const [bulkTitle, setBulkTitle] = useState(BULK_TEMPLATES[0].title);
   const [bulkBody, setBulkBody] = useState(BULK_TEMPLATES[0].body);
   const [bulkIncludePayslip, setBulkIncludePayslip] = useState(true);
   const [showBulkPreview, setShowBulkPreview] = useState(false);
@@ -137,9 +151,14 @@ export default function HrPayrollEmailPage() {
   const [selectedEmpId, setSelectedEmpId] = useState<string>(
     employees[1]?.id ?? employees[0]?.id ?? ""
   );
+  const [indDeliveryEmail, setIndDeliveryEmail] = useState<string>(
+    employees[1]?.email ?? employees[0]?.email ?? ""
+  );
   const [indSubject, setIndSubject] = useState(INDIVIDUAL_TEMPLATES[0].subject);
+  const [indTitle, setIndTitle] = useState(INDIVIDUAL_TEMPLATES[0].title);
   const [indBody, setIndBody] = useState(INDIVIDUAL_TEMPLATES[0].body);
   const [indIncludePayslip, setIndIncludePayslip] = useState(true);
+  const [showIndPreview, setShowIndPreview] = useState(false);
 
   // Sent history state
   const [historyFilter, setHistoryFilter] = useState<"All" | "Bulk" | "Individual">("All");
@@ -209,6 +228,21 @@ export default function HrPayrollEmailPage() {
     [employees, selectedEmpId]
   );
 
+  useEffect(() => {
+    if (selectedIndividualEmp) {
+      setIndDeliveryEmail(selectedIndividualEmp.email);
+    }
+  }, [selectedIndividualEmp]);
+
+  const parsedBulkTestEmails = useMemo(
+    () =>
+      bulkTestEmails
+        .split(/[\s,;]+/)
+        .map((s) => s.trim())
+        .filter((s) => s.includes("@")),
+    [bulkTestEmails]
+  );
+
   const selectedIndividualRecord = useMemo(
     () =>
       selectedIndividualEmp
@@ -223,69 +257,170 @@ export default function HrPayrollEmailPage() {
     );
   };
 
-  const handleSendBulk = (e: React.FormEvent) => {
+  const handleSendBulk = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isOffline || bulkRecipients.length === 0 || !bulkSubject.trim() || !bulkBody.trim()) {
+    const effectiveEmails =
+      parsedBulkTestEmails.length > 0
+        ? parsedBulkTestEmails
+        : bulkRecipients.map((r) => r.email);
+
+    if (
+      isOffline ||
+      isSending ||
+      effectiveEmails.length === 0 ||
+      !bulkSubject.trim() ||
+      !bulkBody.trim()
+    ) {
       return;
     }
 
-    const summaryLabel =
-      bulkAudience === "all_active"
-        ? `All Active Staff (${bulkRecipients.length} recipients)`
-        : bulkAudience === "department"
-        ? `${bulkDepartment} (${bulkRecipients.length} recipients)`
-        : bulkAudience === "flagged"
-        ? `Flagged Payroll Records — Nov 2026 (${bulkRecipients.length} recipients)`
-        : `Custom Selection (${bulkRecipients.length} recipients)`;
+    setFeedback(null);
+    setErrorFeedback(null);
+    setIsSending(true);
 
-    sendHrPayrollEmail({
-      type: "Bulk",
-      subject: bulkSubject,
-      body: bulkBody,
-      recipientSummary: summaryLabel,
-      recipientEmails: bulkRecipients.map((r) => r.email),
-      departmentFilter:
-        bulkAudience === "department" ? bulkDepartment : "All Departments",
-      includePayslipSummary: bulkIncludePayslip,
-      sentBy: user.name,
-      sentByRole: user.role,
-    });
+    const sampleEmp = bulkRecipients[0] ?? employees[0];
+    const renderedSubject = renderMergeTags(bulkSubject, sampleEmp);
+    const renderedTitle = renderMergeTags(bulkTitle, sampleEmp);
+    const renderedBody = renderMergeTags(bulkBody, sampleEmp);
 
-    setFeedback(
-      `Bulk email "${bulkSubject.trim()}" queued and sent to ${bulkRecipients.length} staff member${
-        bulkRecipients.length === 1 ? "" : "s"
-      }.`
-    );
+    try {
+      const res = await fetch("/api/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "Bulk",
+          to: effectiveEmails,
+          subject: renderedSubject,
+          title: renderedTitle,
+          body: renderedBody,
+          includePayslipSummary: bulkIncludePayslip,
+        }),
+      });
+
+      const data = (await res.json()) as {
+        ok: boolean;
+        error?: string;
+        sentCount?: number;
+      };
+
+      if (!res.ok || !data.ok) {
+        setErrorFeedback(data.error || "Failed to send bulk email via SMTP.");
+        return;
+      }
+
+      const summaryLabel =
+        parsedBulkTestEmails.length > 0
+          ? `Test Delivery (${parsedBulkTestEmails.join(", ")})`
+          : bulkAudience === "all_active"
+          ? `All Active Staff (${bulkRecipients.length} recipients)`
+          : bulkAudience === "department"
+          ? `${bulkDepartment} (${bulkRecipients.length} recipients)`
+          : bulkAudience === "flagged"
+          ? `Flagged Payroll Records — Nov 2026 (${bulkRecipients.length} recipients)`
+          : `Custom Selection (${bulkRecipients.length} recipients)`;
+
+      sendHrPayrollEmail({
+        type: "Bulk",
+        subject: renderedSubject,
+        title: renderedTitle,
+        body: renderedBody,
+        recipientSummary: summaryLabel,
+        recipientEmails: effectiveEmails,
+        departmentFilter:
+          bulkAudience === "department" ? bulkDepartment : "All Departments",
+        includePayslipSummary: bulkIncludePayslip,
+        sentBy: user.name,
+        sentByRole: user.role,
+      });
+
+      setFeedback(
+        `Bulk email "${renderedSubject}" delivered via Gmail SMTP to ${effectiveEmails.length} recipient${
+          effectiveEmails.length === 1 ? "" : "s"
+        }.`
+      );
+    } catch {
+      setErrorFeedback("Network error while contacting /api/email/send.");
+    } finally {
+      setIsSending(false);
+    }
   };
 
-  const handleSendIndividual = (e: React.FormEvent) => {
+  const handleSendIndividual = async (e: React.FormEvent) => {
     e.preventDefault();
+    const targetEmail = indDeliveryEmail.trim();
     if (
       isOffline ||
+      isSending ||
       !selectedIndividualEmp ||
+      !targetEmail ||
       !indSubject.trim() ||
       !indBody.trim()
     ) {
       return;
     }
 
+    setFeedback(null);
+    setErrorFeedback(null);
+    setIsSending(true);
+
     const renderedSubject = renderMergeTags(indSubject, selectedIndividualEmp);
+    const renderedTitle = renderMergeTags(indTitle, selectedIndividualEmp);
     const renderedBody = renderMergeTags(indBody, selectedIndividualEmp);
 
-    sendHrPayrollEmail({
-      type: "Individual",
-      subject: renderedSubject,
-      body: renderedBody,
-      recipientSummary: `${selectedIndividualEmp.fullName} (${selectedIndividualEmp.staffId})`,
-      recipientEmails: [selectedIndividualEmp.email],
-      includePayslipSummary: indIncludePayslip,
-      sentBy: user.name,
-      sentByRole: user.role,
-    });
+    try {
+      const res = await fetch("/api/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "Individual",
+          to: [targetEmail],
+          subject: renderedSubject,
+          title: renderedTitle,
+          body: renderedBody,
+          includePayslipSummary: indIncludePayslip,
+          payslipSummary: selectedIndividualRecord
+            ? {
+                periodLabel: "November 2026",
+                employeeName: selectedIndividualEmp.fullName,
+                staffId: selectedIndividualEmp.staffId,
+                department: selectedIndividualEmp.department,
+                grossPay: formatGHS(selectedIndividualRecord.grossPayPesewas),
+                totalDeductions: formatGHS(
+                  selectedIndividualRecord.totalDeductionsPesewas
+                ),
+                netPay: formatGHS(selectedIndividualRecord.netPayPesewas),
+              }
+            : undefined,
+        }),
+      });
 
-    setFeedback(
-      `Email "${renderedSubject}" sent to ${selectedIndividualEmp.fullName} (${selectedIndividualEmp.email}).`
-    );
+      const data = (await res.json()) as { ok: boolean; error?: string };
+
+      if (!res.ok || !data.ok) {
+        setErrorFeedback(data.error || "Failed to send email via SMTP.");
+        return;
+      }
+
+      sendHrPayrollEmail({
+        type: "Individual",
+        subject: renderedSubject,
+        title: renderedTitle,
+        body: renderedBody,
+        recipientSummary: `${selectedIndividualEmp.fullName} (${targetEmail})`,
+        recipientEmails: [targetEmail],
+        includePayslipSummary: indIncludePayslip,
+        sentBy: user.name,
+        sentByRole: user.role,
+      });
+
+      setFeedback(
+        `Email "${renderedSubject}" delivered via Gmail SMTP to ${targetEmail}.`
+      );
+    } catch {
+      setErrorFeedback("Network error while contacting /api/email/send.");
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const filteredLogs = useMemo(() => {
@@ -331,6 +466,29 @@ export default function HrPayrollEmailPage() {
             type="button"
             onClick={() => setFeedback(null)}
             className="underline hover:opacity-80"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* Error banner */}
+      {errorFeedback && (
+        <div
+          style={{
+            backgroundColor: "var(--status-red-bg)",
+            color: "var(--status-red-fg)",
+          }}
+          className="rounded-xl border border-border px-4 py-3 flex items-center justify-between gap-3 text-xs font-semibold"
+        >
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{errorFeedback}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setErrorFeedback(null)}
+            className="underline hover:opacity-80 shrink-0"
           >
             Dismiss
           </button>
@@ -532,11 +690,41 @@ export default function HrPayrollEmailPage() {
               >
                 <span className="inline-flex items-center gap-1.5">
                   <Mail className="h-4 w-4" />
-                  <span>Selected Recipients</span>
+                  <span>
+                    {parsedBulkTestEmails.length > 0
+                      ? "Test Delivery Recipients"
+                      : "Selected Recipients"}
+                  </span>
                 </span>
                 <span className="text-sm font-bold">
-                  {bulkRecipients.length} staff
+                  {parsedBulkTestEmails.length > 0
+                    ? `${parsedBulkTestEmails.length} test email${
+                        parsedBulkTestEmails.length === 1 ? "" : "s"
+                      }`
+                    : `${bulkRecipients.length} staff`}
                 </span>
+              </div>
+
+              {/* Optional Test Delivery Override */}
+              <div className="pt-2 border-t border-border space-y-1.5">
+                <label
+                  htmlFor="bulk-test-emails"
+                  className="block text-xs font-semibold text-text"
+                >
+                  Test Delivery Override{" "}
+                  <span className="font-normal text-muted">(optional)</span>
+                </label>
+                <input
+                  id="bulk-test-emails"
+                  type="text"
+                  value={bulkTestEmails}
+                  onChange={(e) => setBulkTestEmails(e.target.value)}
+                  placeholder="e.g. test1@gmail.com, test2@gmail.com"
+                  className="w-full rounded-lg border border-border bg-page px-3 py-2 text-xs text-text focus:border-primary focus:bg-surface focus:outline-none"
+                />
+                <p className="text-[11px] text-muted leading-relaxed">
+                  Enter one or more real email addresses (comma-separated) to test live Gmail SMTP delivery instead of sending to mock @sundaghana.com addresses.
+                </p>
               </div>
 
               {bulkRecipients.length > 0 && (
@@ -590,6 +778,7 @@ export default function HrPayrollEmailPage() {
                   type="button"
                   onClick={() => {
                     setBulkSubject(tpl.subject);
+                    setBulkTitle(tpl.title);
                     setBulkBody(tpl.body);
                     setBulkIncludePayslip(tpl.includePayslip);
                   }}
@@ -601,8 +790,14 @@ export default function HrPayrollEmailPage() {
             </div>
 
             {showBulkPreview ? (
-              <div className="rounded-xl border border-border bg-page p-4 space-y-3 text-xs">
-                <div className="border-b border-border pb-2.5 space-y-1">
+              <div className="space-y-3 text-xs">
+                <div className="rounded-lg border border-border bg-page p-3 space-y-1">
+                  <div className="text-muted">
+                    From:{" "}
+                    <strong className="text-text">
+                      HR &amp; Payroll — Sunda Ghana Limited
+                    </strong>
+                  </div>
                   <div className="text-muted">
                     To:{" "}
                     <strong className="text-text">
@@ -616,22 +811,42 @@ export default function HrPayrollEmailPage() {
                       </span>
                     )}
                   </div>
-                  <div className="text-muted">
+                  <div className="text-muted pt-1 border-t border-border">
                     Subject:{" "}
                     <strong className="text-text">
                       {renderMergeTags(bulkSubject, bulkRecipients[0])}
                     </strong>
                   </div>
                 </div>
-                <div className="whitespace-pre-wrap text-text leading-relaxed">
-                  {renderMergeTags(bulkBody, bulkRecipients[0])}
-                </div>
-                {bulkIncludePayslip && (
-                  <div className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 py-1.5 text-[11px] font-semibold text-primary">
-                    <FileText className="h-3.5 w-3.5" />
-                    <span>Attachment: November_2026_Payslip_Summary.pdf</span>
+                <div className="rounded-xl border border-border bg-surface overflow-hidden">
+                  <div
+                    style={{ backgroundColor: "var(--primary)" }}
+                    className="px-4 py-2.5 text-white flex items-center justify-between"
+                  >
+                    <span className="font-bold tracking-tight">Sunda Ghana Limited</span>
+                    <span className="text-[11px] opacity-90">HR &amp; Payroll</span>
                   </div>
-                )}
+                  <div className="p-4 space-y-3">
+                    {bulkTitle.trim() && (
+                      <div className="pb-2.5 border-b border-border">
+                        <h3 className="text-sm font-bold text-text">
+                          {renderMergeTags(bulkTitle, bulkRecipients[0])}
+                        </h3>
+                      </div>
+                    )}
+                    <div className="whitespace-pre-wrap text-text leading-relaxed">
+                      {renderMergeTags(bulkBody, bulkRecipients[0])}
+                    </div>
+                    {bulkIncludePayslip && (
+                      <div className="pt-2 border-t border-border">
+                        <div className="inline-flex items-center gap-1.5 rounded-md border border-border bg-page px-2.5 py-1.5 text-[11px] font-semibold text-primary">
+                          <FileText className="h-3.5 w-3.5" />
+                          <span>Attachment: November_2026_Payslip_Summary.pdf</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             ) : (
               <>
@@ -640,7 +855,7 @@ export default function HrPayrollEmailPage() {
                     htmlFor="bulk-subject"
                     className="block text-xs font-semibold text-text mb-1"
                   >
-                    Subject
+                    Subject <span className="font-normal text-muted">(shown in inbox list)</span>
                   </label>
                   <input
                     id="bulk-subject"
@@ -649,6 +864,24 @@ export default function HrPayrollEmailPage() {
                     value={bulkSubject}
                     onChange={(e) => setBulkSubject(e.target.value)}
                     placeholder="Enter email subject..."
+                    className="w-full rounded-lg border border-border bg-page px-3 py-2 text-xs text-text focus:border-primary focus:bg-surface focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="bulk-title"
+                    className="block text-xs font-semibold text-text mb-1"
+                  >
+                    Email Title / Heading <span className="font-normal text-muted">(bold heading inside email)</span>
+                  </label>
+                  <input
+                    id="bulk-title"
+                    type="text"
+                    required
+                    value={bulkTitle}
+                    onChange={(e) => setBulkTitle(e.target.value)}
+                    placeholder="Enter email heading or announcement title..."
                     className="w-full rounded-lg border border-border bg-page px-3 py-2 text-xs text-text focus:border-primary focus:bg-surface focus:outline-none"
                   />
                 </div>
@@ -705,22 +938,38 @@ export default function HrPayrollEmailPage() {
             <div className="pt-2 border-t border-border flex items-center justify-end gap-3">
               <button
                 type="submit"
-                disabled={isOffline || bulkRecipients.length === 0}
+                disabled={
+                  isOffline ||
+                  isSending ||
+                  (parsedBulkTestEmails.length === 0 && bulkRecipients.length === 0)
+                }
                 style={
-                  !isOffline && bulkRecipients.length > 0
+                  !isOffline &&
+                  !isSending &&
+                  (parsedBulkTestEmails.length > 0 || bulkRecipients.length > 0)
                     ? { backgroundColor: "var(--primary)" }
                     : undefined
                 }
                 className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-semibold shadow-sm ${
-                  isOffline || bulkRecipients.length === 0
+                  isOffline ||
+                  isSending ||
+                  (parsedBulkTestEmails.length === 0 && bulkRecipients.length === 0)
                     ? "bg-page border border-border text-muted cursor-not-allowed"
                     : "text-white hover:opacity-95"
                 }`}
               >
-                <Send className="h-3.5 w-3.5" />
+                {isSending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Send className="h-3.5 w-3.5" />
+                )}
                 <span>
-                  {isOffline
+                  {isSending
+                    ? "Sending via Gmail SMTP..."
+                    : isOffline
                     ? "Send Bulk Email (Needs a connection)"
+                    : parsedBulkTestEmails.length > 0
+                    ? `Send Test Bulk Email (${parsedBulkTestEmails.length})`
                     : `Send Bulk Email (${bulkRecipients.length} recipients)`}
                 </span>
               </button>
@@ -797,90 +1046,202 @@ export default function HrPayrollEmailPage() {
           {/* Right: Individual Email Composer */}
           <div className="lg:col-span-7 veltra-card p-5 space-y-4">
             {selectedIndividualEmp && (
-              <div className="rounded-lg bg-page border border-border p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                <div>
-                  <div className="font-bold text-text">
-                    To: {selectedIndividualEmp.fullName} ({selectedIndividualEmp.staffId})
-                  </div>
-                  <div className="text-muted mt-0.5">
-                    {selectedIndividualEmp.email} · {selectedIndividualEmp.department} ·{" "}
-                    {selectedIndividualEmp.jobTitle}
-                  </div>
-                </div>
-                {selectedIndividualRecord && (
-                  <div className="sm:text-right tabular-nums shrink-0">
-                    <div className="text-[11px] text-muted">Nov 2026 Net Pay</div>
-                    <div className="font-bold text-primary">
-                      {formatGHS(selectedIndividualRecord.netPayPesewas)}
+              <div className="rounded-lg bg-page border border-border p-3.5 space-y-2.5 text-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <div className="font-bold text-text">
+                      Employee: {selectedIndividualEmp.fullName} ({selectedIndividualEmp.staffId})
+                    </div>
+                    <div className="text-muted mt-0.5">
+                      {selectedIndividualEmp.department} · {selectedIndividualEmp.jobTitle}
                     </div>
                   </div>
-                )}
+                  {selectedIndividualRecord && (
+                    <div className="sm:text-right tabular-nums shrink-0">
+                      <div className="text-[11px] text-muted">Nov 2026 Net Pay</div>
+                      <div className="font-bold text-primary">
+                        {formatGHS(selectedIndividualRecord.netPayPesewas)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-2 border-t border-border">
+                  <label
+                    htmlFor="ind-delivery-email"
+                    className="block text-[11px] font-semibold text-muted mb-1"
+                  >
+                    Deliver To (editable for live test delivery)
+                  </label>
+                  <input
+                    id="ind-delivery-email"
+                    type="email"
+                    required
+                    value={indDeliveryEmail}
+                    onChange={(e) => setIndDeliveryEmail(e.target.value)}
+                    placeholder="Enter recipient email address..."
+                    className="w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-text focus:border-primary focus:outline-none"
+                  />
+                </div>
               </div>
             )}
 
-            {/* Individual Templates */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-semibold text-muted mr-1">
-                Templates:
-              </span>
-              {INDIVIDUAL_TEMPLATES.map((tpl) => (
-                <button
-                  key={tpl.id}
-                  type="button"
-                  onClick={() => {
-                    setIndSubject(tpl.subject);
-                    setIndBody(tpl.body);
-                    setIndIncludePayslip(tpl.includePayslip);
-                  }}
-                  className="rounded-md border border-border bg-page px-2.5 py-1 text-[11px] font-semibold text-text hover:border-primary hover:text-primary"
-                >
-                  {tpl.label}
-                </button>
-              ))}
+            {/* Individual Templates & Preview Toggle */}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] font-semibold text-muted mr-1">
+                  Templates:
+                </span>
+                {INDIVIDUAL_TEMPLATES.map((tpl) => (
+                  <button
+                    key={tpl.id}
+                    type="button"
+                    onClick={() => {
+                      setIndSubject(tpl.subject);
+                      setIndTitle(tpl.title);
+                      setIndBody(tpl.body);
+                      setIndIncludePayslip(tpl.includePayslip);
+                    }}
+                    className="rounded-md border border-border bg-page px-2.5 py-1 text-[11px] font-semibold text-text hover:border-primary hover:text-primary"
+                  >
+                    {tpl.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowIndPreview((v) => !v)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-page px-3 py-1.5 text-xs font-semibold text-text hover:border-primary"
+              >
+                {showIndPreview ? (
+                  <EyeOff className="h-3.5 w-3.5" />
+                ) : (
+                  <Eye className="h-3.5 w-3.5" />
+                )}
+                <span>{showIndPreview ? "Edit Message" : "Preview"}</span>
+              </button>
             </div>
 
-            <div>
-              <label
-                htmlFor="ind-subject"
-                className="block text-xs font-semibold text-text mb-1"
-              >
-                Subject
-              </label>
-              <input
-                id="ind-subject"
-                type="text"
-                required
-                value={indSubject}
-                onChange={(e) => setIndSubject(e.target.value)}
-                placeholder="Enter email subject..."
-                className="w-full rounded-lg border border-border bg-page px-3 py-2 text-xs text-text focus:border-primary focus:bg-surface focus:outline-none"
-              />
-            </div>
+            {showIndPreview ? (
+              <div className="space-y-3 text-xs">
+                <div className="rounded-lg border border-border bg-page p-3 space-y-1">
+                  <div className="text-muted">
+                    From:{" "}
+                    <strong className="text-text">
+                      HR &amp; Payroll — Sunda Ghana Limited
+                    </strong>
+                  </div>
+                  <div className="text-muted">
+                    To:{" "}
+                    <strong className="text-text">
+                      {selectedIndividualEmp
+                        ? `${selectedIndividualEmp.fullName} <${selectedIndividualEmp.email}>`
+                        : "No employee selected"}
+                    </strong>
+                  </div>
+                  <div className="text-muted pt-1 border-t border-border">
+                    Subject:{" "}
+                    <strong className="text-text">
+                      {renderMergeTags(indSubject, selectedIndividualEmp)}
+                    </strong>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-border bg-surface overflow-hidden">
+                  <div
+                    style={{ backgroundColor: "var(--primary)" }}
+                    className="px-4 py-2.5 text-white flex items-center justify-between"
+                  >
+                    <span className="font-bold tracking-tight">Sunda Ghana Limited</span>
+                    <span className="text-[11px] opacity-90">HR &amp; Payroll</span>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    {indTitle.trim() && (
+                      <div className="pb-2.5 border-b border-border">
+                        <h3 className="text-sm font-bold text-text">
+                          {renderMergeTags(indTitle, selectedIndividualEmp)}
+                        </h3>
+                      </div>
+                    )}
+                    <div className="whitespace-pre-wrap text-text leading-relaxed">
+                      {renderMergeTags(indBody, selectedIndividualEmp)}
+                    </div>
+                    {indIncludePayslip && selectedIndividualEmp && (
+                      <div className="pt-2 border-t border-border">
+                        <div className="inline-flex items-center gap-1.5 rounded-md border border-border bg-page px-2.5 py-1.5 text-[11px] font-semibold text-primary">
+                          <FileText className="h-3.5 w-3.5" />
+                          <span>
+                            Attachment: Nov_2026_Payslip_{selectedIndividualEmp.staffId}.pdf
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label
+                    htmlFor="ind-subject"
+                    className="block text-xs font-semibold text-text mb-1"
+                  >
+                    Subject <span className="font-normal text-muted">(shown in inbox list)</span>
+                  </label>
+                  <input
+                    id="ind-subject"
+                    type="text"
+                    required
+                    value={indSubject}
+                    onChange={(e) => setIndSubject(e.target.value)}
+                    placeholder="Enter email subject..."
+                    className="w-full rounded-lg border border-border bg-page px-3 py-2 text-xs text-text focus:border-primary focus:bg-surface focus:outline-none"
+                  />
+                </div>
 
-            <div>
-              <label
-                htmlFor="ind-body"
-                className="block text-xs font-semibold text-text mb-1"
-              >
-                Message
-              </label>
-              <textarea
-                id="ind-body"
-                rows={7}
-                required
-                value={indBody}
-                onChange={(e) => setIndBody(e.target.value)}
-                placeholder="Write a message to this employee..."
-                className="w-full rounded-lg border border-border bg-page px-3 py-2 text-xs text-text leading-relaxed focus:border-primary focus:bg-surface focus:outline-none"
-              />
-              {selectedIndividualEmp && (
-                <p className="text-[11px] text-muted mt-1">
-                  Merge tags like <code className="text-primary">{"{{name}}"}</code> and{" "}
-                  <code className="text-primary">{"{{staffId}}"}</code> automatically resolve to{" "}
-                  <strong>{selectedIndividualEmp.fullName}</strong> ({selectedIndividualEmp.staffId}).
-                </p>
-              )}
-            </div>
+                <div>
+                  <label
+                    htmlFor="ind-title"
+                    className="block text-xs font-semibold text-text mb-1"
+                  >
+                    Email Title / Heading <span className="font-normal text-muted">(bold heading inside email)</span>
+                  </label>
+                  <input
+                    id="ind-title"
+                    type="text"
+                    required
+                    value={indTitle}
+                    onChange={(e) => setIndTitle(e.target.value)}
+                    placeholder="Enter email heading or notice title..."
+                    className="w-full rounded-lg border border-border bg-page px-3 py-2 text-xs text-text focus:border-primary focus:bg-surface focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="ind-body"
+                    className="block text-xs font-semibold text-text mb-1"
+                  >
+                    Message
+                  </label>
+                  <textarea
+                    id="ind-body"
+                    rows={7}
+                    required
+                    value={indBody}
+                    onChange={(e) => setIndBody(e.target.value)}
+                    placeholder="Write a message to this employee..."
+                    className="w-full rounded-lg border border-border bg-page px-3 py-2 text-xs text-text leading-relaxed focus:border-primary focus:bg-surface focus:outline-none"
+                  />
+                  {selectedIndividualEmp && (
+                    <p className="text-[11px] text-muted mt-1">
+                      Merge tags like <code className="text-primary">{"{{name}}"}</code> and{" "}
+                      <code className="text-primary">{"{{staffId}}"}</code> automatically resolve to{" "}
+                      <strong>{selectedIndividualEmp.fullName}</strong> ({selectedIndividualEmp.staffId}).
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
 
             <label className="flex items-center gap-2 text-xs text-text cursor-pointer">
               <input
@@ -897,21 +1258,27 @@ export default function HrPayrollEmailPage() {
             <div className="pt-2 border-t border-border flex items-center justify-end gap-3">
               <button
                 type="submit"
-                disabled={isOffline || !selectedIndividualEmp}
+                disabled={isOffline || isSending || !selectedIndividualEmp || !indDeliveryEmail.trim()}
                 style={
-                  !isOffline && selectedIndividualEmp
+                  !isOffline && !isSending && selectedIndividualEmp && indDeliveryEmail.trim()
                     ? { backgroundColor: "var(--primary)" }
                     : undefined
                 }
                 className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-semibold shadow-sm ${
-                  isOffline || !selectedIndividualEmp
+                  isOffline || isSending || !selectedIndividualEmp || !indDeliveryEmail.trim()
                     ? "bg-page border border-border text-muted cursor-not-allowed"
                     : "text-white hover:opacity-95"
                 }`}
               >
-                <Send className="h-3.5 w-3.5" />
+                {isSending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Send className="h-3.5 w-3.5" />
+                )}
                 <span>
-                  {isOffline
+                  {isSending
+                    ? "Sending via Gmail SMTP..."
+                    : isOffline
                     ? "Send Email (Needs a connection)"
                     : "Send Individual Email"}
                 </span>
@@ -1011,8 +1378,15 @@ export default function HrPayrollEmailPage() {
                     </div>
 
                     {isExpanded && (
-                      <div className="mt-3 rounded-lg border border-border bg-page p-3.5 text-xs text-text whitespace-pre-wrap leading-relaxed">
-                        {log.body}
+                      <div className="mt-3 rounded-lg border border-border bg-page p-3.5 text-xs text-text space-y-2">
+                        {log.title && (
+                          <div className="font-bold text-sm text-text pb-2 border-b border-border">
+                            {log.title}
+                          </div>
+                        )}
+                        <div className="whitespace-pre-wrap leading-relaxed">
+                          {log.body}
+                        </div>
                       </div>
                     )}
                   </div>
