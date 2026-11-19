@@ -139,6 +139,19 @@ export const NAVIGATION_ITEMS: NavItemConfig[] = [
     },
   },
   {
+    id: "email",
+    label: "HR/Payroll Email",
+    href: "/email",
+    icon: "Mail",
+    permissions: {
+      Employee: "none",
+      Supervisor: "none",
+      "HR/Payroll": "yes",
+      Finance: "none",
+      Admin: "none",
+    },
+  },
+  {
     id: "reports",
     label: "Reports",
     href: "/reports",

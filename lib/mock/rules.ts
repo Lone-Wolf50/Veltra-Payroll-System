@@ -107,10 +107,10 @@ export const INITIAL_SYSTEM_RULES: SystemRules = {
  *    - Bonus Tax (5%) = Bonus Tax Base * 5%
  *    - Excess Bonus = max(0, Total Bonus - Bonus Tax Base)
  *    - Cash Allowance = Total Overtime Salary
- *    - PAYE Base (Chargeable Income) = Basic Wage Earned - NSSF EE + Cash Allowance + Excess Bonus
+ *    - PAYE Base (Chargeable Income) = Basic Wage Earned - NSSF EE - Other Deduction (Before Tax) + Cash Allowance + Excess Bonus
  *    - PAYE = Progressive GRA Bands applied to PAYE Base
  *    - Total GRA = Bonus Tax + OT Tax + PAYE
- *    - Net Pay = Gross Salary - NSSF EE - Total GRA - After-Tax Deductions (including EWA recovery)
+ *    - Net Pay = Gross Salary - NSSF EE - Other Deduction (Before Tax) - Total GRA - After-Tax Deductions (including EWA recovery)
  *    - HR Cost = Gross Salary + NSSF ER (13%)
  */
 export function calculateSundaExcelPayroll(params: {
@@ -123,6 +123,7 @@ export function calculateSundaExcelPayroll(params: {
   paidDays?: number;
   coefficientScore?: number; // e.g. 1.5, 1.0, 2.0
   otherIncomePesewas?: number; // Leave pay, key position, production incentive, overproduction allowance
+  otherDeductionBeforeTaxPesewas?: number; // Pre-tax deductions (e.g. unpaid leave / salary adjustment / pre-tax deduction)
   fullAttendanceBonusPesewas?: number;
   lunchAllowancePesewas?: number;
   workdayOtHours?: number;
@@ -155,6 +156,7 @@ export function calculateSundaExcelPayroll(params: {
     Math.round(performanceStdCedis * coeff * 100) / 100;
 
   const otherIncomeCedis = (params.otherIncomePesewas ?? 0) / 100;
+  const otherDeductionBeforeTaxCedis = (params.otherDeductionBeforeTaxPesewas ?? 0) / 100;
   const fullAttendanceCedis = (params.fullAttendanceBonusPesewas ?? 0) / 100;
   const lunchCedis = (params.lunchAllowancePesewas ?? 0) / 100;
 
@@ -235,12 +237,18 @@ export function calculateSundaExcelPayroll(params: {
     }
   }
 
-  // PAYE Base = Basic Earned - NSSF EE (unrounded 5.5%) + Cash Allowance + Excess Bonus
+  // PAYE Base = Basic Earned - NSSF EE (unrounded 5.5%) - Other Deduction (Before Tax) + Cash Allowance + Excess Bonus
   const rawNssfEe = basicEarnedCedis * 0.055;
   const payeBaseCedis =
     Math.round(
-      Math.max(0, basicEarnedCedis - rawNssfEe + cashAllowanceCedis + excessBonusCedis) *
-        100
+      Math.max(
+        0,
+        basicEarnedCedis -
+          rawNssfEe -
+          otherDeductionBeforeTaxCedis +
+          cashAllowanceCedis +
+          excessBonusCedis
+      ) * 100
     ) / 100;
 
   const useExcelBands =
@@ -263,7 +271,10 @@ export function calculateSundaExcelPayroll(params: {
   const ewaRecoveryCedis = (params.ewaRecoveryPesewas ?? 0) / 100;
 
   const totalDeductionsCedis =
-    Math.round((nssfEeCedis + totalGraCedis + ewaRecoveryCedis) * 100) / 100;
+    Math.round(
+      (nssfEeCedis + otherDeductionBeforeTaxCedis + totalGraCedis + ewaRecoveryCedis) *
+        100
+    ) / 100;
   const netPayCedis =
     Math.round(Math.max(0, grossSalaryCedis - totalDeductionsCedis) * 100) / 100;
   const hrCostCedis = Math.round((grossSalaryCedis + nssfEr13Cedis) * 100) / 100;
@@ -293,6 +304,7 @@ export function calculateSundaExcelPayroll(params: {
     positionEarnedPesewas: toP(positionEarnedCedis),
     performanceEarnedPesewas: toP(performanceEarnedCedis),
     otherIncomePesewas: toP(otherIncomeCedis),
+    otherDeductionBeforeTaxPesewas: toP(otherDeductionBeforeTaxCedis),
     fullAttendanceBonusPesewas: toP(fullAttendanceCedis),
     lunchAllowancePesewas: toP(lunchCedis),
     totalBonusPesewas: toP(totalBonusCedis),
@@ -326,6 +338,7 @@ export function calculateStatutoryAndNet(params: {
   basicSalaryPesewas: number;
   allowancesPesewas?: number;
   overtimePayPesewas?: number;
+  otherDeductionBeforeTaxPesewas?: number;
   ewaRecoveryPesewas?: number;
   rules?: SystemRules;
   periodMonth?: string; // "2026-11"
@@ -334,6 +347,7 @@ export function calculateStatutoryAndNet(params: {
   const basic = params.basicSalaryPesewas;
   const allowances = params.allowancesPesewas ?? 0;
   const overtime = params.overtimePayPesewas ?? 0;
+  const otherDeductionBeforeTax = params.otherDeductionBeforeTaxPesewas ?? 0;
   const ewaRecovery = params.ewaRecoveryPesewas ?? 0;
 
   const grossPayPesewas = basic + allowances + overtime;
@@ -341,7 +355,10 @@ export function calculateStatutoryAndNet(params: {
   const ssnitEmployeePesewas = Math.round(basic * (rules.ssnitEmployeeRatePercent / 100));
   const ssnitEmployerPesewas = Math.round(basic * (rules.ssnitEmployerRatePercent / 100));
 
-  const chargeableIncomePesewas = Math.max(0, grossPayPesewas - ssnitEmployeePesewas);
+  const chargeableIncomePesewas = Math.max(
+    0,
+    grossPayPesewas - ssnitEmployeePesewas - otherDeductionBeforeTax
+  );
 
   const usePreSep =
     params.periodMonth && params.periodMonth < "2026-09";
@@ -353,13 +370,15 @@ export function calculateStatutoryAndNet(params: {
 
   const payePesewas = computePayeFromBands(chargeableIncomePesewas, schedule.bands);
 
-  const totalDeductionsPesewas = ssnitEmployeePesewas + payePesewas + ewaRecovery;
+  const totalDeductionsPesewas =
+    ssnitEmployeePesewas + otherDeductionBeforeTax + payePesewas + ewaRecovery;
   const netPayPesewas = Math.max(0, grossPayPesewas - totalDeductionsPesewas);
 
   return {
     basicSalaryPesewas: basic,
     allowancesPesewas: allowances,
     overtimePayPesewas: overtime,
+    otherDeductionBeforeTaxPesewas: otherDeductionBeforeTax,
     grossPayPesewas,
     ssnitEmployeePesewas,
     ssnitEmployerPesewas,

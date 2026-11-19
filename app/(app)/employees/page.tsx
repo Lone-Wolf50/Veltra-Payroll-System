@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/components/providers/auth-provider";
 import { getEmployees } from "@/lib/data";
 import { Employee } from "@/lib/types";
@@ -17,6 +18,7 @@ import {
   FolderCheck,
   CheckCircle2,
   Printer,
+  Mail,
 } from "lucide-react";
 
 function maskBankAccount(account: string): string {
@@ -237,6 +239,16 @@ export default function EmployeesPage() {
 
                     <td className="px-4 py-3.5 text-right">
                       <div className="inline-flex items-center gap-2">
+                        {user.role === "HR/Payroll" && (
+                          <Link
+                            href={`/email?employeeId=${emp.id}`}
+                            className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-primary hover:border-primary"
+                            title={`Send individual email to ${emp.fullName}`}
+                          >
+                            <Mail className="h-3.5 w-3.5" />
+                            <span>Email</span>
+                          </Link>
+                        )}
                         <button
                           type="button"
                           onClick={() => {

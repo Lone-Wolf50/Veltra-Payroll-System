@@ -16,6 +16,7 @@ import {
   BarChart3,
   History,
   Settings,
+  Mail,
   X,
 } from "lucide-react";
 import { VeltraLogo } from "@/components/ui/logo";
@@ -37,6 +38,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   BarChart3,
   History,
   Settings,
+  Mail,
 };
 
 export function Sidebar({

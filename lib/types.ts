@@ -107,6 +107,7 @@ export interface PayrollRecord {
   positionEarnedPesewas?: number;
   performanceEarnedPesewas?: number;
   otherIncomePesewas?: number;
+  otherDeductionBeforeTaxPesewas?: number;
   fullAttendanceBonusPesewas?: number;
   lunchAllowancePesewas?: number;
   totalBonusPesewas?: number;
@@ -164,6 +165,7 @@ export interface PayrollRun {
   totalSsnitEmployerPesewas: number;
   totalPayePesewas: number;
   totalStatutoryPesewas: number; // ssnitEmployee + paye
+  totalOtherDeductionBeforeTaxPesewas?: number;
   totalEwaRecoveryPesewas: number;
   totalNetPesewas: number;
   totalPayrollCostPesewas: number; // gross + ssnitEmployer
@@ -281,12 +283,28 @@ export interface SystemRules {
   };
 }
 
+export interface EmailLogEntry {
+  id: string;
+  type: "Bulk" | "Individual";
+  subject: string;
+  body: string;
+  recipientSummary: string;
+  recipientCount: number;
+  recipientEmails: string[];
+  departmentFilter?: string;
+  includePayslipSummary?: boolean;
+  sentBy: string;
+  sentByRole: Role;
+  sentAt: string;
+  status: "Sent";
+}
+
 export interface AuditEntry {
   id: string;
   timestamp: string;
   actorName: string;
   actorRole: Role;
-  category: "Payroll" | "Anomaly" | "Approval" | "Settings" | "EWA" | "Auth";
+  category: "Payroll" | "Anomaly" | "Approval" | "Settings" | "EWA" | "Auth" | "Email";
   action: string;
   details: string;
 }

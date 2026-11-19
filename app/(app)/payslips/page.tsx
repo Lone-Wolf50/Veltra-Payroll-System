@@ -149,6 +149,12 @@ export default function PayslipsPage() {
                 </span>
               </div>
               <div className="flex justify-between">
+                <span className="text-muted">Other Deduction (Before Tax)</span>
+                <span className="font-semibold text-text">
+                  {formatGHS(active.record.otherDeductionBeforeTaxPesewas ?? 0)}
+                </span>
+              </div>
+              <div className="flex justify-between">
                 <span className="text-muted">GRA PAYE Income Tax</span>
                 <span className="font-semibold text-text">
                   {formatGHS(active.record.payePesewas)}
@@ -178,10 +184,7 @@ export default function PayslipsPage() {
             <span>{formatGHS(active.record.netPayPesewas)}</span>
           </div>
 
-          <div className="mt-4 flex items-center justify-between text-[11px] text-muted tabular-nums">
-            <span>
-              Chargeable Income: {formatGHS(active.record.chargeableIncomePesewas)}
-            </span>
+          <div className="mt-4 flex items-center justify-end text-[11px] text-muted tabular-nums">
             <span>
               Employer SSNIT (13.5%):{" "}
               {formatGHS(active.record.ssnitEmployerPesewas)}

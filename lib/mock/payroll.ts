@@ -198,6 +198,7 @@ export function buildInitialPayrollData(employees: Employee[] = INITIAL_EMPLOYEE
     let totalSsnitEmployeePesewas = 0;
     let totalSsnitEmployerPesewas = 0;
     let totalPayePesewas = 0;
+    let totalOtherDeductionBeforeTaxPesewas = 0;
     let totalEwaRecoveryPesewas = 0;
     let totalNetPesewas = 0;
     let flaggedCount = 0;
@@ -293,6 +294,10 @@ export function buildInitialPayrollData(employees: Employee[] = INITIAL_EMPLOYEE
       const ewaRecoveryPesewas =
         isMainNov && (empNum === 2 || empNum === 16) ? 45000 : 0; // GHS 450 recovery
 
+      // Sample pre-tax deductions (Other Deduction Before Tax) for select staff
+      const otherDeductionBeforeTaxPesewas =
+        !excelSpec && empNum > 1 && empNum % 7 === 0 ? 10000 : 0; // GHS 100.00 pre-tax deduction
+
       let calc: ReturnType<typeof calculateSundaExcelPayroll>;
 
       if (excelSpec) {
@@ -306,6 +311,7 @@ export function buildInitialPayrollData(employees: Employee[] = INITIAL_EMPLOYEE
           paidDays: excelSpec.paidDays,
           coefficientScore: excelSpec.coefficientScore,
           otherIncomePesewas: excelSpec.otherIncomePesewas,
+          otherDeductionBeforeTaxPesewas: 0,
           fullAttendanceBonusPesewas: excelSpec.fullAttendanceBonusPesewas,
           lunchAllowancePesewas: excelSpec.lunchAllowancePesewas,
           workdayOtHours: excelSpec.workdayOtHours,
@@ -377,6 +383,7 @@ export function buildInitialPayrollData(employees: Employee[] = INITIAL_EMPLOYEE
           paidDays: anomalySpec?.daysPaidOverride ?? 20,
           coefficientScore: 1.0,
           otherIncomePesewas: 0,
+          otherDeductionBeforeTaxPesewas,
           fullAttendanceBonusPesewas: 10000,
           lunchAllowancePesewas: 10000,
           workdayOtHours: wdHours,
@@ -436,6 +443,7 @@ export function buildInitialPayrollData(employees: Employee[] = INITIAL_EMPLOYEE
         positionEarnedPesewas: calc.positionEarnedPesewas,
         performanceEarnedPesewas: calc.performanceEarnedPesewas,
         otherIncomePesewas: calc.otherIncomePesewas,
+        otherDeductionBeforeTaxPesewas: calc.otherDeductionBeforeTaxPesewas,
         fullAttendanceBonusPesewas: calc.fullAttendanceBonusPesewas,
         lunchAllowancePesewas: calc.lunchAllowancePesewas,
         totalBonusPesewas: calc.totalBonusPesewas,
@@ -500,6 +508,7 @@ export function buildInitialPayrollData(employees: Employee[] = INITIAL_EMPLOYEE
       totalSsnitEmployeePesewas += calc.ssnitEmployeePesewas;
       totalSsnitEmployerPesewas += calc.ssnitEmployerPesewas;
       totalPayePesewas += calc.payePesewas;
+      totalOtherDeductionBeforeTaxPesewas += calc.otherDeductionBeforeTaxPesewas ?? 0;
       totalEwaRecoveryPesewas += calc.ewaRecoveryPesewas;
       totalNetPesewas += calc.netPayPesewas;
     });
@@ -579,6 +588,7 @@ export function buildInitialPayrollData(employees: Employee[] = INITIAL_EMPLOYEE
       totalSsnitEmployerPesewas,
       totalPayePesewas,
       totalStatutoryPesewas: totalSsnitEmployeePesewas + totalPayePesewas,
+      totalOtherDeductionBeforeTaxPesewas,
       totalEwaRecoveryPesewas,
       totalNetPesewas,
       totalPayrollCostPesewas: totalGrossPesewas + totalSsnitEmployerPesewas,

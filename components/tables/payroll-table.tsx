@@ -14,6 +14,8 @@ import {
 import { PayrollRecord, Department } from "@/lib/types";
 import { formatGHS } from "@/lib/format";
 import { StatusPill } from "@/components/ui/status-pill";
+import { useAuth } from "@/components/providers/auth-provider";
+import { updatePayrollRecordOtherDeduction } from "@/lib/data";
 import {
   Search,
   Download,
@@ -24,6 +26,8 @@ import {
   X,
   AlertTriangle,
   ShieldCheck,
+  Pencil,
+  Check,
 } from "lucide-react";
 
 const columnHelper = createColumnHelper<PayrollRecord>();
@@ -45,11 +49,39 @@ export function PayrollRecordsTable({
   periodLabel: string;
   externalSearch?: string;
 }) {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState(externalSearch);
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [deptFilter, setDeptFilter] = useState<string>("All");
   const [sorting, setSorting] = useState<SortingState>([]);
   const [selectedRecord, setSelectedRecord] = useState<PayrollRecord | null>(null);
+  const [editingPreTax, setEditingPreTax] = useState(false);
+  const [preTaxInput, setPreTaxInput] = useState("");
+  const canEditPreTax = user.role === "HR/Payroll";
+
+  const handleOpenBreakdown = (rec: PayrollRecord) => {
+    setSelectedRecord(rec);
+    setEditingPreTax(false);
+    setPreTaxInput(((rec.otherDeductionBeforeTaxPesewas ?? 0) / 100).toFixed(2));
+  };
+
+  const handleSavePreTaxDeduction = () => {
+    if (!selectedRecord) return;
+    const parsed = parseFloat(preTaxInput);
+    const pesewas = Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed * 100) : 0;
+    const updated = updatePayrollRecordOtherDeduction({
+      runId: selectedRecord.runId,
+      recordId: selectedRecord.id,
+      otherDeductionBeforeTaxPesewas: pesewas,
+      actorName: user.name,
+      actorRole: user.role,
+    });
+    if (updated) {
+      setSelectedRecord(updated);
+      setPreTaxInput(((updated.otherDeductionBeforeTaxPesewas ?? 0) / 100).toFixed(2));
+    }
+    setEditingPreTax(false);
+  };
 
   useEffect(() => {
     if (externalSearch !== undefined) {
@@ -144,6 +176,9 @@ export function PayrollRecordsTable({
               <div className="text-[11px] text-muted">
                 GRA {formatGHS(r.totalGraTaxPesewas ?? r.payePesewas)} · NSSF{" "}
                 {formatGHS(r.ssnitEmployeePesewas)}
+                {(r.otherDeductionBeforeTaxPesewas ?? 0) > 0 && (
+                  <> · Pre-Tax {formatGHS(r.otherDeductionBeforeTaxPesewas ?? 0)}</>
+                )}
               </div>
             </div>
           );
@@ -175,7 +210,7 @@ export function PayrollRecordsTable({
         cell: (info) => (
           <button
             type="button"
-            onClick={() => setSelectedRecord(info.row.original)}
+            onClick={() => handleOpenBreakdown(info.row.original)}
             className="inline-flex items-center gap-1 rounded-lg border border-border bg-page px-2.5 py-1 text-xs font-semibold text-text hover:border-primary hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <Eye className="h-3.5 w-3.5" />
@@ -217,6 +252,7 @@ export function PayrollRecordsTable({
       "Position Earned (GHS)",
       "Performance Earned (GHS)",
       "Other Income (GHS)",
+      "Other Deduction (Before Tax) (GHS)",
       "Full Attendance (GHS)",
       "Lunch Allowance (GHS)",
       "Total Bonus (GHS)",
@@ -255,6 +291,7 @@ export function PayrollRecordsTable({
       ((r.positionEarnedPesewas ?? 0) / 100).toFixed(2),
       ((r.performanceEarnedPesewas ?? 0) / 100).toFixed(2),
       ((r.otherIncomePesewas ?? 0) / 100).toFixed(2),
+      ((r.otherDeductionBeforeTaxPesewas ?? 0) / 100).toFixed(2),
       ((r.fullAttendanceBonusPesewas ?? 0) / 100).toFixed(2),
       ((r.lunchAllowancePesewas ?? 0) / 100).toFixed(2),
       (r.allowancesPesewas / 100).toFixed(2),
@@ -738,11 +775,11 @@ export function PayrollRecordsTable({
                 </div>
               </div>
 
-              {/* 3. Statutory Deductions: NSSF, Bonus Tax (5%), Junior OT Tax (5%/10%), PAYE & Total GRA */}
+              {/* 4. Statutory & Pre-Tax Deductions: NSSF, Other Deduction (Before Tax), Bonus Tax, OT Tax & PAYE */}
               <div className="rounded-lg bg-page p-3 border border-border space-y-1.5">
                 <div className="font-semibold text-text mb-1 flex items-center justify-between">
                   <span>
-                    3. Statutory Deductions (NSSF, Bonus Tax, OT Tax & PAYE)
+                    4. Statutory & Pre-Tax Deductions
                   </span>
                   <span className="text-[11px] font-bold text-primary">
                     Class: {selectedRecord.seniorityLevel ?? "Seniors"}
@@ -755,6 +792,61 @@ export function PayrollRecordsTable({
                   <span className="font-semibold text-text">
                     - {formatGHS(selectedRecord.ssnitEmployeePesewas)}
                   </span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted">
+                    Other Deduction (Before Tax):
+                  </span>
+                  {editingPreTax ? (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] text-muted">GHS</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={preTaxInput}
+                        onChange={(e) => setPreTaxInput(e.target.value)}
+                        className="w-24 rounded border border-primary bg-surface px-2 py-0.5 text-right text-xs font-semibold text-text focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSavePreTaxDeduction}
+                        className="inline-flex items-center gap-0.5 rounded bg-primary px-2 py-0.5 text-[11px] font-semibold text-white hover:opacity-95"
+                      >
+                        <Check className="h-3 w-3" />
+                        <span>Save</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingPreTax(false)}
+                        className="rounded border border-border px-1.5 py-0.5 text-[11px] text-muted hover:text-text"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-text">
+                        - {formatGHS(selectedRecord.otherDeductionBeforeTaxPesewas ?? 0)}
+                      </span>
+                      {canEditPreTax && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPreTaxInput(
+                              ((selectedRecord.otherDeductionBeforeTaxPesewas ?? 0) / 100).toFixed(2)
+                            );
+                            setEditingPreTax(true);
+                          }}
+                          className="inline-flex items-center gap-0.5 rounded border border-border bg-surface px-1.5 py-0.5 text-[10px] font-semibold text-primary hover:border-primary"
+                          title="Edit Other Deduction (Before Tax)"
+                        >
+                          <Pencil className="h-2.5 w-2.5" />
+                          <span>Edit</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
                 {(selectedRecord.otTaxPesewas ?? 0) > 0 ? (
                   <div className="flex justify-between">
@@ -795,7 +887,7 @@ export function PayrollRecordsTable({
                 )}
                 <div className="flex justify-between">
                   <span className="text-muted">
-                    PAYE Base (Basic - NSSF EE + Cash Allow. + Excess Bonus):
+                    PAYE Base (Basic - NSSF EE - Other Ded. Before Tax + Cash Allow. + Excess Bonus):
                   </span>
                   <span className="font-medium text-muted">
                     {formatGHS(selectedRecord.chargeableIncomePesewas)}
@@ -839,7 +931,7 @@ export function PayrollRecordsTable({
                 }}
                 className="rounded-lg p-3.5 flex items-center justify-between text-sm font-bold"
               >
-                <span>Net Pay (Gross - NSSF EE - Total GRA):</span>
+                <span>Net Pay (Gross - Total Deductions):</span>
                 <span>{formatGHS(selectedRecord.netPayPesewas)}</span>
               </div>
 

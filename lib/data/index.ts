@@ -16,6 +16,7 @@ import {
   AttendanceRecord,
   SystemRules,
   AuditEntry,
+  EmailLogEntry,
   AnomalyResolutionStatus,
   Role,
 } from "../types";
@@ -28,7 +29,11 @@ import {
   INITIAL_AUDIT_TRAIL,
   getOvertimeByDepartment,
 } from "../mock/payroll";
-import { INITIAL_SYSTEM_RULES, calculateStatutoryAndNet } from "../mock/rules";
+import {
+  INITIAL_SYSTEM_RULES,
+  calculateStatutoryAndNet,
+  computePayeFromBands,
+} from "../mock/rules";
 
 export type ConnectionState =
   | "online"
@@ -48,9 +53,42 @@ interface DataStoreState {
   attendance: AttendanceRecord[];
   rules: SystemRules;
   auditTrail: AuditEntry[];
+  emailLogs: EmailLogEntry[];
   connectionState: ConnectionState;
   pendingSyncCount: number;
 }
+
+const INITIAL_EMAIL_LOGS: EmailLogEntry[] = [
+  {
+    id: "eml-001",
+    type: "Bulk",
+    subject: "October 2026 Payslips Now Available",
+    body: "Dear Staff,\n\nYour October 2026 statutory payslip has been published and is available for download in the Veltra Payroll portal.\n\nRegards,\nHR & Payroll — Sunda Ghana Limited",
+    recipientSummary: "All Active Staff (58 recipients)",
+    recipientCount: 58,
+    recipientEmails: INITIAL_EMPLOYEES.filter((e) => e.status === "Active").map((e) => e.email),
+    departmentFilter: "All Departments",
+    includePayslipSummary: true,
+    sentBy: "Akua Mensah",
+    sentByRole: "HR/Payroll",
+    sentAt: "2026-10-28T16:30:00Z",
+    status: "Sent",
+  },
+  {
+    id: "eml-002",
+    type: "Individual",
+    subject: "Action Required: SSNIT Number Verification",
+    body: "Dear Kwame Osei,\n\nPlease submit a copy of your SSNIT card to the HR/Payroll office before the November 2026 payroll cutoff so your statutory filing remains up to date.\n\nRegards,\nHR & Payroll — Sunda Ghana Limited",
+    recipientSummary: "Kwame Osei (SGL-1002)",
+    recipientCount: 1,
+    recipientEmails: ["kwame.osei@sundaghana.com"],
+    includePayslipSummary: false,
+    sentBy: "Akua Mensah",
+    sentByRole: "HR/Payroll",
+    sentAt: "2026-11-02T09:45:00Z",
+    status: "Sent",
+  },
+];
 
 const initialBuilt = buildInitialPayrollData(INITIAL_EMPLOYEES);
 
@@ -65,6 +103,7 @@ let store: DataStoreState = {
   attendance: [...INITIAL_ATTENDANCE_RECORDS],
   rules: JSON.parse(JSON.stringify(INITIAL_SYSTEM_RULES)),
   auditTrail: [...INITIAL_AUDIT_TRAIL],
+  emailLogs: [...INITIAL_EMAIL_LOGS],
   connectionState: "online",
   pendingSyncCount: 0,
 };
@@ -739,6 +778,156 @@ export function updateSystemRules(params: {
   });
 
   notify();
+}
+
+// --- Other Deduction (Before Tax) Update ---
+export function updatePayrollRecordOtherDeduction(params: {
+  runId: string;
+  recordId: string;
+  otherDeductionBeforeTaxPesewas: number;
+  actorName: string;
+  actorRole: Role;
+}): PayrollRecord | undefined {
+  const records = store.recordsByRun[params.runId];
+  if (!records) return undefined;
+  const idx = records.findIndex((r) => r.id === params.recordId);
+  if (idx === -1) return undefined;
+
+  const rec = records[idx];
+  const run = store.runs.find((r) => r.id === params.runId);
+  const newDeduction = Math.max(0, Math.round(params.otherDeductionBeforeTaxPesewas));
+
+  // Recompute PAYE Base (Chargeable Income) with new pre-tax deduction
+  const isExcelRow =
+    rec.staffId === "100001" ||
+    rec.staffId === "100002" ||
+    rec.staffId === "100003";
+  const schedule =
+    (isExcelRow || (run && run.periodMonth < "2026-09")
+      ? store.rules.payeSchedules.find((s) => s.id === "sunda-excel-2026")
+      : store.rules.payeSchedules.find(
+          (s) => s.id === store.rules.activePayeScheduleId
+        )) ?? store.rules.payeSchedules[0];
+
+  const baseBeforePreTax =
+    rec.staffId === "SGL-1001"
+      ? rec.grossPayPesewas - rec.ssnitEmployeePesewas
+      : Math.round(
+          rec.basicSalaryPesewas -
+            rec.basicSalaryPesewas * 0.055 +
+            (rec.cashAllowancePesewas ?? rec.overtimePayPesewas) +
+            (rec.excessBonusPesewas ?? 0)
+        );
+
+  const newPayeBasePesewas = Math.max(0, baseBeforePreTax - newDeduction);
+  const newPayePesewas = computePayeFromBands(newPayeBasePesewas, schedule.bands);
+  const newTotalGraTaxPesewas =
+    (rec.bonusTaxPesewas ?? 0) + (rec.otTaxPesewas ?? 0) + newPayePesewas;
+  const newTotalDeductionsPesewas =
+    rec.ssnitEmployeePesewas +
+    newDeduction +
+    newTotalGraTaxPesewas +
+    rec.ewaRecoveryPesewas;
+  const newNetPayPesewas = Math.max(
+    0,
+    rec.grossPayPesewas - newTotalDeductionsPesewas
+  );
+
+  const updatedRecord: PayrollRecord = {
+    ...rec,
+    otherDeductionBeforeTaxPesewas: newDeduction,
+    chargeableIncomePesewas: newPayeBasePesewas,
+    payeBasePesewas: newPayeBasePesewas,
+    payePesewas: newPayePesewas,
+    totalGraTaxPesewas: newTotalGraTaxPesewas,
+    totalDeductionsPesewas: newTotalDeductionsPesewas,
+    netPayPesewas: newNetPayPesewas,
+  };
+
+  const updatedRecords = records.map((r, i) => (i === idx ? updatedRecord : r));
+  store.recordsByRun[params.runId] = updatedRecords;
+
+  // Recalculate parent run totals
+  if (run) {
+    run.totalPayePesewas = updatedRecords.reduce((s, r) => s + r.payePesewas, 0);
+    run.totalStatutoryPesewas =
+      run.totalSsnitEmployeePesewas + run.totalPayePesewas;
+    run.totalOtherDeductionBeforeTaxPesewas = updatedRecords.reduce(
+      (s, r) => s + (r.otherDeductionBeforeTaxPesewas ?? 0),
+      0
+    );
+    run.totalNetPesewas = updatedRecords.reduce((s, r) => s + r.netPayPesewas, 0);
+  }
+
+  store.auditTrail.unshift({
+    id: `aud-${Date.now()}`,
+    timestamp: new Date().toISOString(),
+    actorName: params.actorName,
+    actorRole: params.actorRole,
+    category: "Payroll",
+    action: "Updated Other Deduction (Before Tax)",
+    details: `Set Other Deduction (Before Tax) for ${rec.employeeName} (${rec.staffId}) to GHS ${(
+      newDeduction / 100
+    ).toFixed(2)}. PAYE recalculated to GHS ${(newPayePesewas / 100).toFixed(
+      2
+    )}, Net Pay GHS ${(newNetPayPesewas / 100).toFixed(2)}.`,
+  });
+
+  notify();
+  return updatedRecord;
+}
+
+// --- HR/Payroll Email (Bulk & Individual) ---
+export function getEmailLogs(): EmailLogEntry[] {
+  return store.emailLogs;
+}
+
+export function sendHrPayrollEmail(params: {
+  type: "Bulk" | "Individual";
+  subject: string;
+  body: string;
+  recipientSummary: string;
+  recipientEmails: string[];
+  departmentFilter?: string;
+  includePayslipSummary?: boolean;
+  sentBy: string;
+  sentByRole: Role;
+}): EmailLogEntry {
+  const entry: EmailLogEntry = {
+    id: `eml-${Date.now()}`,
+    type: params.type,
+    subject: params.subject.trim(),
+    body: params.body.trim(),
+    recipientSummary: params.recipientSummary,
+    recipientCount: params.recipientEmails.length,
+    recipientEmails: params.recipientEmails,
+    departmentFilter: params.departmentFilter,
+    includePayslipSummary: params.includePayslipSummary,
+    sentBy: params.sentBy,
+    sentByRole: params.sentByRole,
+    sentAt: new Date().toISOString(),
+    status: "Sent",
+  };
+
+  store.emailLogs = [entry, ...store.emailLogs];
+
+  store.auditTrail.unshift({
+    id: `aud-${Date.now()}`,
+    timestamp: entry.sentAt,
+    actorName: params.sentBy,
+    actorRole: params.sentByRole,
+    category: "Email",
+    action:
+      params.type === "Bulk"
+        ? `Sent Bulk Email (${entry.recipientCount} recipients)`
+        : `Sent Individual Email`,
+    details: `Subject: "${entry.subject}" · Recipients: ${entry.recipientSummary}${
+      params.includePayslipSummary ? " · Included payslip summary" : ""
+    }`,
+  });
+
+  notify();
+  return entry;
 }
 
 // --- Audit Trail & Department Overtime ---
