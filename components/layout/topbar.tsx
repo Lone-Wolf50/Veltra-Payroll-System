@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import {
   Menu,
@@ -26,8 +26,9 @@ import {
   getWorkforceSizeMode,
   setWorkforceSizeMode,
   getAnomalies,
+  getLeaveRequests,
 } from "@/lib/data";
-import { Role } from "@/lib/roles";
+import { Role, canAccessRoute } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 export function Topbar({
@@ -40,11 +41,12 @@ export function Topbar({
   onGlobalSearchChange: (val: string) => void;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { theme, setTheme } = useTheme();
   const {
     user,
     allUsers,
-    signInAsRole,
+    signInAsUser,
     signOut,
     connectionState,
     pendingSyncCount,
@@ -78,9 +80,17 @@ export function Topbar({
   }, []);
 
   const workforceMode = getWorkforceSizeMode();
-  const openAnomalies = getAnomalies("run-2026-11").filter(
-    (a) => a.status === "Needs review"
-  );
+  const canSeePayrollNotifications =
+    user.role === "HR/Payroll" || user.role === "Finance";
+  const canSeeLeaveApprovals =
+    user.role === "Supervisor" || user.role === "HR/Payroll";
+  const openAnomalies = canSeePayrollNotifications
+    ? getAnomalies("run-2026-11").filter((a) => a.status === "Needs review")
+    : [];
+  const pendingLeaves = canSeeLeaveApprovals
+    ? getLeaveRequests().filter((l) => l.status === "Pending")
+    : [];
+  const notifCount = openAnomalies.length + pendingLeaves.length;
 
   const renderConnectionBadge = () => {
     switch (connectionState) {
@@ -169,20 +179,22 @@ export function Topbar({
             <Menu className="h-5 w-5" />
           </button>
 
-          <div className="relative w-full">
-            <label htmlFor="topbar-global-search" className="sr-only">
-              Search employees, staff IDs, or departments
-            </label>
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-            <input
-              id="topbar-global-search"
-              type="search"
-              value={globalSearch}
-              onChange={(e) => onGlobalSearchChange(e.target.value)}
-              placeholder="Search employee, staff ID, department..."
-              className="w-full rounded-lg border border-border bg-page pl-9 pr-3 py-1.5 text-sm text-text placeholder:text-muted focus:border-primary focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20"
-            />
-          </div>
+          {user.role !== "Employee" && (
+            <div className="relative w-full">
+              <label htmlFor="topbar-global-search" className="sr-only">
+                Search employees, staff IDs, or departments
+              </label>
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+              <input
+                id="topbar-global-search"
+                type="search"
+                value={globalSearch}
+                onChange={(e) => onGlobalSearchChange(e.target.value)}
+                placeholder="Search employee, staff ID, department..."
+                className="w-full rounded-lg border border-border bg-page pl-9 pr-3 py-1.5 text-sm text-text placeholder:text-muted focus:border-primary focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+            </div>
+          )}
         </div>
 
         {/* Right: Connection indicator, Workforce scale toggle, Notifications, Theme toggle, User menu */}
@@ -287,7 +299,7 @@ export function Topbar({
               aria-label="Notifications"
             >
               <Bell className="h-5 w-5" />
-              {openAnomalies.length > 0 && (
+              {notifCount > 0 && (
                 <span
                   className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full"
                   style={{ backgroundColor: "var(--status-red-fg)" }}
@@ -300,26 +312,47 @@ export function Topbar({
                 <div className="flex items-center justify-between pb-2 border-b border-border">
                   <span className="text-xs font-semibold text-text">Notifications</span>
                   <span className="text-[11px] text-muted">
-                    {openAnomalies.length} needing review
+                    {notifCount > 0 ? `${notifCount} pending` : "All caught up"}
                   </span>
                 </div>
                 <div className="mt-2 space-y-2 max-h-60 overflow-y-auto">
-                  <div className="rounded-lg bg-page p-2.5 text-xs">
-                    <div className="font-semibold text-text">
-                      Nov 2026 Payroll Deadline in 2 Days
+                  {canSeePayrollNotifications && (
+                    <>
+                      <div className="rounded-lg bg-page p-2.5 text-xs">
+                        <div className="font-semibold text-text">
+                          Nov 2026 Payroll Deadline in 2 Days
+                        </div>
+                        <p className="text-muted mt-0.5">
+                          Cutoff is 05 Nov 2026. {openAnomalies.length} records are flagged for review.
+                        </p>
+                      </div>
+                      <div className="rounded-lg bg-page p-2.5 text-xs">
+                        <div className="font-semibold text-text">
+                          Stage 1 Approval Completed
+                        </div>
+                        <p className="text-muted mt-0.5">
+                          Kofi Owusu (Supervisor) approved the Nov 2026 run.
+                        </p>
+                      </div>
+                    </>
+                  )}
+                  {canSeeLeaveApprovals && pendingLeaves.length > 0 && (
+                    <div className="rounded-lg bg-page p-2.5 text-xs">
+                      <div className="font-semibold text-text">
+                        {pendingLeaves.length} Pending Leave Application
+                        {pendingLeaves.length === 1 ? "" : "s"}
+                      </div>
+                      <p className="text-muted mt-0.5">
+                        Review staff leave requests in Leave Applications.
+                      </p>
                     </div>
-                    <p className="text-muted mt-0.5">
-                      Cutoff is 05 Nov 2026. {openAnomalies.length} records are flagged for review.
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-page p-2.5 text-xs">
-                    <div className="font-semibold text-text">
-                      Stage 1 Approval Completed
-                    </div>
-                    <p className="text-muted mt-0.5">
-                      Kofi Owusu (Supervisor) approved the Nov 2026 run.
-                    </p>
-                  </div>
+                  )}
+                  {!canSeePayrollNotifications &&
+                    !(canSeeLeaveApprovals && pendingLeaves.length > 0) && (
+                      <div className="rounded-lg bg-page p-2.5 text-xs text-muted">
+                        No new notifications for your account.
+                      </div>
+                    )}
                 </div>
               </div>
             )}
@@ -425,28 +458,43 @@ export function Topbar({
                     <Users className="h-3.5 w-3.5 text-primary" />
                     <span>Switch Demo Role</span>
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1 max-h-56 overflow-y-auto">
                     {allUsers.map((u) => {
-                      const active = u.role === user.role;
+                      const active = u.id === user.id;
+                      const isNewlyAdded = u.id.startsWith("usr-emp-");
                       return (
                         <button
                           key={u.id}
                           type="button"
                           onClick={() => {
-                            signInAsRole(u.role as Role);
+                            signInAsUser(u.id);
                             setUserMenuOpen(false);
+                            if (!canAccessRoute(u.role, pathname)) {
+                              router.replace("/dashboard");
+                            }
                           }}
                           className={cn(
-                            "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-xs transition-colors",
+                            "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-xs transition-colors text-left gap-2",
                             active
                               ? "bg-primary-soft text-primary font-semibold"
                               : "text-text hover:bg-page"
                           )}
                         >
-                          <span>
+                          <span className="truncate">
                             {u.name} <span className="text-muted">({u.role})</span>
+                            {isNewlyAdded && (
+                              <span
+                                style={{
+                                  backgroundColor: "var(--status-green-bg)",
+                                  color: "var(--status-green-fg)",
+                                }}
+                                className="ml-1.5 rounded px-1 py-0.5 text-[10px] font-semibold"
+                              >
+                                New
+                              </span>
+                            )}
                           </span>
-                          {active && <CheckCircle2 className="h-3.5 w-3.5" />}
+                          {active && <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />}
                         </button>
                       );
                     })}

@@ -244,6 +244,12 @@ export function PayrollRecordsTable({
       "Employee Name",
       "Department",
       "Should Work Days",
+      "Casual Leave Days (Unpaid)",
+      "Absent Days (Unpaid)",
+      "Sick Leave Days (Paid)",
+      "Annual Leave Days (Paid)",
+      "Maternity Leave Days (Paid)",
+      "Work Injury Leave Days (Paid)",
       "Actual Working Days",
       "Paid Days",
       "Basic Wage STD (GHS)",
@@ -283,6 +289,12 @@ export function PayrollRecordsTable({
       `"${r.employeeName}"`,
       `"${r.department}"`,
       r.daysExpected,
+      r.casualLeaveDays ?? 0,
+      r.absentDays ?? 0,
+      r.sickLeaveDays ?? 0,
+      r.annualLeaveDays ?? 0,
+      r.maternityLeaveDays ?? 0,
+      r.workInjuryLeaveDays ?? 0,
       r.daysAttended,
       r.daysPaid,
       (r.basicSalaryPesewas / 100).toFixed(2),
@@ -567,18 +579,50 @@ export function PayrollRecordsTable({
             )}
 
             <div className="mt-4 space-y-3 text-xs tabular-nums max-h-[70vh] overflow-y-auto pr-1">
-              {/* 1. Wage Standards & Working Days */}
+              {/* 1. Wage Standards, Attendance & Leave Days */}
               <div className="rounded-lg bg-page p-3 border border-border space-y-1.5">
                 <div className="font-semibold text-text mb-1 flex items-center justify-between">
                   <span>
-                    1. Wage Standards & Rates ({selectedRecord.daysAttended}/
+                    1. Wage Standards, Attendance &amp; Leave Days ({selectedRecord.daysAttended}/
                     {selectedRecord.daysExpected} actual · {selectedRecord.daysPaid} paid days)
                   </span>
                 </div>
+                <div className="grid grid-cols-3 gap-1.5 py-1.5 border-y border-border/60 text-[11px]">
+                  <div className="rounded bg-surface px-2 py-1 border border-border/60 flex justify-between">
+                    <span className="text-muted">Casual (Unpaid):</span>
+                    <strong className="text-text">{selectedRecord.casualLeaveDays ?? 0}d</strong>
+                  </div>
+                  <div className="rounded bg-surface px-2 py-1 border border-border/60 flex justify-between">
+                    <span className="text-muted">Absent (Unpaid):</span>
+                    <strong className="text-text">{selectedRecord.absentDays ?? 0}d</strong>
+                  </div>
+                  <div className="rounded bg-surface px-2 py-1 border border-border/60 flex justify-between">
+                    <span className="text-muted">Sick (Paid):</span>
+                    <strong className="text-text">{selectedRecord.sickLeaveDays ?? 0}d</strong>
+                  </div>
+                  <div className="rounded bg-surface px-2 py-1 border border-border/60 flex justify-between">
+                    <span className="text-muted">Annual (Paid):</span>
+                    <strong className="text-text">{selectedRecord.annualLeaveDays ?? 0}d</strong>
+                  </div>
+                  <div className="rounded bg-surface px-2 py-1 border border-border/60 flex justify-between">
+                    <span className="text-muted">Maternity (Paid):</span>
+                    <strong className="text-text">{selectedRecord.maternityLeaveDays ?? 0}d</strong>
+                  </div>
+                  <div className="rounded bg-surface px-2 py-1 border border-border/60 flex justify-between">
+                    <span className="text-muted">Work Injury (Paid):</span>
+                    <strong className="text-text">{selectedRecord.workInjuryLeaveDays ?? 0}d</strong>
+                  </div>
+                </div>
                 <div className="flex justify-between">
-                  <span className="text-muted">Basic Wage STD:</span>
+                  <span className="text-muted">
+                    Basic Wage STD (Daily × {selectedRecord.daysExpected}):
+                  </span>
                   <span className="font-semibold text-text">
-                    {formatGHS(selectedRecord.basicSalaryPesewas)}
+                    {formatGHS(
+                      (selectedRecord.dailyWageStdPesewas ??
+                        Math.round(selectedRecord.basicSalaryPesewas / 20)) *
+                        selectedRecord.daysExpected
+                    )}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -637,14 +681,18 @@ export function PayrollRecordsTable({
                   2. Earned Wages & Allowance
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted">Basic Wage Earned:</span>
+                  <span className="text-muted">
+                    Basic Wage Earned (STD × {selectedRecord.daysPaid}/{selectedRecord.daysExpected} paid days):
+                  </span>
                   <span className="font-semibold text-text">
                     {formatGHS(selectedRecord.basicSalaryPesewas)}
                   </span>
                 </div>
                 {(selectedRecord.positionEarnedPesewas ?? 0) > 0 && (
                   <div className="flex justify-between">
-                    <span className="text-muted">Position Earned:</span>
+                    <span className="text-muted">
+                      Position Earned (STD × {selectedRecord.daysPaid}/{selectedRecord.daysExpected} paid days):
+                    </span>
                     <span className="font-semibold text-text">
                       {formatGHS(selectedRecord.positionEarnedPesewas ?? 0)}
                     </span>
@@ -654,7 +702,8 @@ export function PayrollRecordsTable({
                   <div className="flex justify-between">
                     <span className="text-muted">
                       Performance Earned ({formatGHS(selectedRecord.performanceStdPesewas ?? 0)} ×{" "}
-                      {selectedRecord.coefficientScore} Co. Score):
+                      {selectedRecord.daysPaid}/{selectedRecord.daysExpected} ×{" "}
+                      {Math.round((selectedRecord.coefficientScore ?? 1) * 100)}%):
                     </span>
                     <span className="font-semibold text-text">
                       {formatGHS(selectedRecord.performanceEarnedPesewas ?? 0)}

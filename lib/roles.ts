@@ -113,6 +113,19 @@ export const NAVIGATION_ITEMS: NavItemConfig[] = [
     },
   },
   {
+    id: "leave",
+    label: "Leave Applications",
+    href: "/leave",
+    icon: "CalendarDays",
+    permissions: {
+      Employee: "yes",
+      Supervisor: "yes",
+      "HR/Payroll": "yes",
+      Finance: "yes",
+      Admin: "yes",
+    },
+  },
+  {
     id: "ewa",
     label: "Earned Wage Access",
     href: "/ewa",

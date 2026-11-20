@@ -88,7 +88,13 @@ export interface PayrollRecord {
   employeeStatus: EmployeeStatus;
   daysExpected: number; // Should Working Days (default 20)
   daysAttended: number; // Actual working days
-  daysPaid: number; // Paid days
+  daysPaid: number; // Paid days = Should - Casual - Absent
+  casualLeaveDays?: number; // Unpaid leave (deducted from pay)
+  absentDays?: number; // Unexcused absence from clock-in (deducted from pay)
+  sickLeaveDays?: number; // Paid (12 days/year)
+  annualLeaveDays?: number; // Paid (15 working days/year)
+  maternityLeaveDays?: number; // Paid (3 months / 60 working days/year)
+  workInjuryLeaveDays?: number; // Paid (indefinite)
   overtimeHours: number; // Total OT Hours (Workday + Saturday + Sunday + Holiday)
   workdayOtHours?: number;
   saturdayOtHours?: number;
@@ -283,6 +289,51 @@ export interface SystemRules {
   };
 }
 
+export type LeaveType =
+  | "Annual Leave"
+  | "Sick Leave"
+  | "Casual Leave"
+  | "Maternity Leave"
+  | "Work Injury Leave";
+
+export type LeaveRequestStatus = "Pending" | "Approved" | "Rejected";
+
+export interface LeaveRequest {
+  id: string;
+  employeeId: string;
+  staffId: string;
+  employeeName: string;
+  department: Department;
+  leaveType: LeaveType;
+  applicationMode: "All day" | "Half day";
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  durationDays: number;
+  reason: string;
+  attachmentName?: string;
+  isPaid: boolean;
+  status: LeaveRequestStatus;
+  submittedAt: string;
+  reviewedBy?: string;
+  reviewedByRole?: Role;
+  reviewedAt?: string;
+  reviewComment?: string;
+}
+
+export interface EmployeeLeaveBalances {
+  annualEntitlementDays: number; // 15 working days/year
+  annualUsedDays: number;
+  annualRemainingDays: number;
+  sickEntitlementDays: number; // 12 days/year
+  sickUsedDays: number;
+  sickRemainingDays: number;
+  maternityEntitlementDays: number; // 3 months (~60 working days/year)
+  maternityUsedDays: number;
+  maternityRemainingDays: number;
+  casualUsedDays: number; // unpaid
+  workInjuryUsedDays: number; // paid, indefinite
+}
+
 export interface EmailLogEntry {
   id: string;
   type: "Bulk" | "Individual";
@@ -305,7 +356,7 @@ export interface AuditEntry {
   timestamp: string;
   actorName: string;
   actorRole: Role;
-  category: "Payroll" | "Anomaly" | "Approval" | "Settings" | "EWA" | "Auth" | "Email";
+  category: "Payroll" | "Anomaly" | "Approval" | "Settings" | "EWA" | "Auth" | "Email" | "Leave";
   action: string;
   details: string;
 }

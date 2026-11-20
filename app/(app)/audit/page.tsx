@@ -52,6 +52,7 @@ export default function AuditTrailPage() {
           <option value="Anomaly">Anomaly Reviews</option>
           <option value="Approval">Approvals</option>
           <option value="EWA">Simulated EWA</option>
+          <option value="Leave">Leave Applications</option>
           <option value="Email">HR/Payroll Email</option>
           <option value="Settings">Settings & Rules</option>
         </select>

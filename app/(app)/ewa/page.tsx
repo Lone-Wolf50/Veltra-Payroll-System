@@ -22,17 +22,19 @@ import {
 
 export default function EwaPage() {
   const { user, connectionState } = useAuth();
-  const [selectedEmpId, setSelectedEmpId] = useState(
-    user.role === "Employee" ? user.employeeId : "emp-002"
-  );
+  const isEmployee = user.role === "Employee";
+  const [selectedEmpId, setSelectedEmpId] = useState("emp-002");
   const [amountInput, setAmountInput] = useState("250");
   const [resultFeedback, setResultFeedback] = useState<{
     approved: boolean;
     message: string;
   } | null>(null);
 
-  const ewaStatus = getEmployeeEwaStatus(selectedEmpId);
-  const allRequests = getEwaRequests();
+  const effectiveEmpId = isEmployee ? user.employeeId : selectedEmpId;
+  const ewaStatus = getEmployeeEwaStatus(effectiveEmpId);
+  const visibleRequests = isEmployee
+    ? getEwaRequests(user.employeeId)
+    : getEwaRequests();
   const usageChartData = getEwaUsageChartData();
   const isOffline = connectionState === "offline";
 
@@ -58,7 +60,7 @@ export default function EwaPage() {
   const handleRequestSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const res = submitSimulatedEwaRequest({
-      employeeId: selectedEmpId,
+      employeeId: effectiveEmpId,
       amountPesewas: requestedPesewas,
     });
     setResultFeedback({
@@ -293,7 +295,55 @@ export default function EwaPage() {
         </div>
 
         <div className="lg:col-span-6">
-          <EwaUsageChart data={usageChartData} />
+          {isEmployee ? (
+            <div className="veltra-card p-6 space-y-4 h-full">
+              <div className="border-b border-border pb-3">
+                <h2 className="text-base font-bold text-text">
+                  How Your EWA Limit Is Calculated
+                </h2>
+                <p className="text-xs text-muted mt-0.5">
+                  Based on your Monthly Basic Salary and current eligibility status.
+                </p>
+              </div>
+              <div className="space-y-2.5 text-xs tabular-nums">
+                <div className="flex justify-between py-1.5 border-b border-border/60">
+                  <span className="text-muted">Monthly Basic Salary</span>
+                  <span className="font-bold text-text">
+                    {formatGHS(ewaStatus.employee.basicSalaryPesewas)}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1.5 border-b border-border/60">
+                  <span className="text-muted">Earned So Far (15 / 22 working days)</span>
+                  <span className="font-semibold text-text">
+                    {formatGHS(ewaStatus.earnedToDatePesewas)}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1.5 border-b border-border/60">
+                  <span className="text-muted">
+                    {ewaStatus.rules.ewaMaxPercentage}% of Earned Wages
+                  </span>
+                  <span className="font-semibold text-text">
+                    {formatGHS(ewaStatus.maxByPercentPesewas)}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1.5 border-b border-border/60">
+                  <span className="text-muted">Per-Request Cap (System Rule)</span>
+                  <span className="font-semibold text-text">
+                    {formatGHS(ewaStatus.perRequestCapPesewas)}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1.5">
+                  <span className="text-muted">Eligibility Status</span>
+                  <StatusPill
+                    status={ewaStatus.ineligibleReason ? "Ineligible" : "Eligible"}
+                    variant={ewaStatus.ineligibleReason ? "red" : "green"}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <EwaUsageChart data={usageChartData} />
+          )}
         </div>
       </div>
 
@@ -301,10 +351,14 @@ export default function EwaPage() {
       <div className="veltra-card overflow-hidden">
         <div className="p-5 border-b border-border">
           <h2 className="text-base font-bold text-text">
-            Simulated EWA Transactions & Recovery Log
+            {isEmployee
+              ? "My EWA Requests & Recovery Log"
+              : "Simulated EWA Transactions & Recovery Log"}
           </h2>
           <p className="text-xs text-muted mt-0.5">
-            Includes approved advances scheduled for payroll recovery and declined requests with reasons.
+            {isEmployee
+              ? "Your personal advance requests and scheduled payroll recoveries."
+              : "Includes approved advances scheduled for payroll recovery and declined requests with reasons."}
           </p>
         </div>
 
@@ -322,7 +376,17 @@ export default function EwaPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border text-sm tabular-nums">
-              {allRequests.map((req) => (
+              {visibleRequests.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="px-4 py-10 text-center text-xs text-muted"
+                  >
+                    You have not made any Earned Wage Access requests yet.
+                  </td>
+                </tr>
+              ) : (
+                visibleRequests.map((req) => (
                 <tr key={req.id} className="hover:bg-page/60">
                   <td className="px-4 py-3.5 text-xs text-muted">
                     {formatDateTime(req.requestedAt)}
@@ -352,7 +416,8 @@ export default function EwaPage() {
                         : "Queued for Nov 2026 payroll deduction")}
                   </td>
                 </tr>
-              ))}
+                ))
+              )}
             </tbody>
           </table>
         </div>

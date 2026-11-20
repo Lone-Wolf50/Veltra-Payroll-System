@@ -15,6 +15,7 @@ interface AuthContextValue {
   user: User;
   allUsers: User[];
   signInAsRole: (role: Role) => void;
+  signInAsUser: (userId: string) => void;
   signInWithEmail: (email: string) => { ok: boolean; error?: string };
   signOut: () => void;
   connectionState: ConnectionState;
@@ -37,13 +38,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const savedRole = localStorage.getItem(STORAGE_KEY) as Role | null;
       if (savedRole) {
-        const found = allUsers.find((u) => u.role === savedRole);
+        const found = getMockUsers().find((u) => u.role === savedRole);
         if (found) setUser(found);
       }
     } catch {
       // ignore storage errors
     }
-  }, [allUsers]);
+  }, []);
 
   useEffect(() => {
     return subscribeDataStore(() => {
@@ -53,6 +54,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInAsRole = (role: Role) => {
     const found = allUsers.find((u) => u.role === role);
+    if (found) {
+      setUser(found);
+      try {
+        localStorage.setItem(STORAGE_KEY, found.role);
+      } catch {}
+    }
+  };
+
+  const signInAsUser = (userId: string) => {
+    const found = allUsers.find((u) => u.id === userId);
     if (found) {
       setUser(found);
       try {
@@ -90,6 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         allUsers,
         signInAsRole,
+        signInAsUser,
         signInWithEmail,
         signOut,
         connectionState: conn.state,

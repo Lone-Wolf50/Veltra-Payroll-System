@@ -17,6 +17,9 @@ import {
   SystemRules,
   AuditEntry,
   EmailLogEntry,
+  LeaveRequest,
+  LeaveType,
+  EmployeeLeaveBalances,
   AnomalyResolutionStatus,
   Role,
 } from "../types";
@@ -32,6 +35,7 @@ import {
 import {
   INITIAL_SYSTEM_RULES,
   calculateStatutoryAndNet,
+  calculateSundaExcelPayroll,
   computePayeFromBands,
 } from "../mock/rules";
 
@@ -54,9 +58,66 @@ interface DataStoreState {
   rules: SystemRules;
   auditTrail: AuditEntry[];
   emailLogs: EmailLogEntry[];
+  leaveRequests: LeaveRequest[];
   connectionState: ConnectionState;
   pendingSyncCount: number;
 }
+
+const INITIAL_LEAVE_REQUESTS: LeaveRequest[] = [
+  {
+    id: "lv-001",
+    employeeId: "emp-002",
+    staffId: "SGL-1002",
+    employeeName: "Kwame Osei",
+    department: "Manufacturing & Assembly",
+    leaveType: "Annual Leave",
+    applicationMode: "All day",
+    startDate: "2026-10-12",
+    endDate: "2026-10-14",
+    durationDays: 3,
+    reason: "Family travel to Kumasi.",
+    isPaid: true,
+    status: "Approved",
+    submittedAt: "2026-10-05T09:15:00Z",
+    reviewedBy: "Kofi Owusu",
+    reviewedByRole: "Supervisor",
+    reviewedAt: "2026-10-06T11:30:00Z",
+    reviewComment: "Approved. Shift coverage arranged.",
+  },
+  {
+    id: "lv-002",
+    employeeId: "emp-002",
+    staffId: "SGL-1002",
+    employeeName: "Kwame Osei",
+    department: "Manufacturing & Assembly",
+    leaveType: "Casual Leave",
+    applicationMode: "All day",
+    startDate: "2026-11-23",
+    endDate: "2026-11-24",
+    durationDays: 2,
+    reason: "Personal errands in Accra.",
+    isPaid: false,
+    status: "Pending",
+    submittedAt: "2026-11-19T14:20:00Z",
+  },
+  {
+    id: "lv-003",
+    employeeId: "emp-007",
+    staffId: "100002",
+    employeeName: "John Doe",
+    department: "Logistics & Warehouse",
+    leaveType: "Sick Leave",
+    applicationMode: "All day",
+    startDate: "2026-11-20",
+    endDate: "2026-11-21",
+    durationDays: 2,
+    reason: "Clinic recovery — doctor's medical note attached.",
+    attachmentName: "Tema_General_Medical_Note_Nov2026.pdf",
+    isPaid: true,
+    status: "Pending",
+    submittedAt: "2026-11-19T16:05:00Z",
+  },
+];
 
 const INITIAL_EMAIL_LOGS: EmailLogEntry[] = [
   {
@@ -106,6 +167,7 @@ let store: DataStoreState = {
   rules: JSON.parse(JSON.stringify(INITIAL_SYSTEM_RULES)),
   auditTrail: [...INITIAL_AUDIT_TRAIL],
   emailLogs: [...INITIAL_EMAIL_LOGS],
+  leaveRequests: [...INITIAL_LEAVE_REQUESTS],
   connectionState: "online",
   pendingSyncCount: 0,
 };
@@ -189,6 +251,131 @@ export function getEmployeeById(id: string): Employee | undefined {
   return store.employees.find((e) => e.id === id);
 }
 
+function buildPayrollRecordForEmployee(
+  emp: Employee,
+  runId: string = "run-2026-11"
+): PayrollRecord {
+  const run = store.runs.find((r) => r.id === runId);
+  const calc = calculateSundaExcelPayroll({
+    basicSalaryPesewas: emp.basicSalaryPesewas,
+    positionStdPesewas: emp.positionStdPesewas ?? emp.transportAllowancePesewas,
+    performanceStdPesewas: emp.performanceStdPesewas ?? emp.housingAllowancePesewas,
+    seniorityLevel: emp.seniorityLevel ?? "Juniors",
+    shouldWorkingDays: 20,
+    casualLeaveDays: 0,
+    absentDays: 0,
+    sickLeaveDays: 0,
+    annualLeaveDays: 0,
+    maternityLeaveDays: 0,
+    workInjuryLeaveDays: 0,
+    coefficientScore: 1.0,
+    otherIncomePesewas: 0,
+    otherDeductionBeforeTaxPesewas: 0,
+    fullAttendanceBonusPesewas: 0,
+    lunchAllowancePesewas: 0,
+    workdayOtHours: 0,
+    saturdayOtHours: 0,
+    sundayOtHours: 0,
+    holidayOtHours: 0,
+    ewaRecoveryPesewas: 0,
+    useExcelPayeBands: false,
+    rules: store.rules,
+    periodMonth: run?.periodMonth ?? "2026-11",
+  });
+
+  return {
+    id: `prec-${runId}-${emp.id}`,
+    runId,
+    employeeId: emp.id,
+    staffId: emp.staffId,
+    employeeName: emp.fullName,
+    department: emp.department,
+    jobTitle: emp.jobTitle,
+    employeeStatus: emp.status,
+    daysExpected: calc.daysExpected,
+    daysAttended: calc.daysAttended,
+    daysPaid: calc.daysPaid,
+    casualLeaveDays: calc.casualLeaveDays,
+    absentDays: calc.absentDays,
+    sickLeaveDays: calc.sickLeaveDays,
+    annualLeaveDays: calc.annualLeaveDays,
+    maternityLeaveDays: calc.maternityLeaveDays,
+    workInjuryLeaveDays: calc.workInjuryLeaveDays,
+    overtimeHours: 0,
+    workdayOtHours: 0,
+    saturdayOtHours: 0,
+    sundayOtHours: 0,
+    holidayOtHours: 0,
+    workdayOtPayPesewas: 0,
+    saturdayOtPayPesewas: 0,
+    sundayOtPayPesewas: 0,
+    holidayOtPayPesewas: 0,
+    dailyWageStdPesewas: calc.dailyWageStdPesewas,
+    hourlyWageStdPesewas: calc.hourlyWageStdPesewas,
+    positionStdPesewas: calc.positionStdPesewas,
+    performanceStdPesewas: calc.performanceStdPesewas,
+    totalGrossStdPesewas: calc.totalGrossStdPesewas,
+    coefficientScore: calc.coefficientScore,
+    positionEarnedPesewas: calc.positionEarnedPesewas,
+    performanceEarnedPesewas: calc.performanceEarnedPesewas,
+    otherIncomePesewas: calc.otherIncomePesewas,
+    otherDeductionBeforeTaxPesewas: calc.otherDeductionBeforeTaxPesewas,
+    fullAttendanceBonusPesewas: calc.fullAttendanceBonusPesewas,
+    lunchAllowancePesewas: calc.lunchAllowancePesewas,
+    totalBonusPesewas: calc.totalBonusPesewas,
+    bonusTaxBasePesewas: calc.bonusTaxBasePesewas,
+    bonusTaxPesewas: calc.bonusTaxPesewas,
+    otTaxBasePesewas: calc.otTaxBasePesewas,
+    otTaxPesewas: calc.otTaxPesewas,
+    cashAllowancePesewas: calc.cashAllowancePesewas,
+    excessBonusPesewas: calc.excessBonusPesewas,
+    payeBasePesewas: calc.payeBasePesewas,
+    totalGraTaxPesewas: calc.totalGraTaxPesewas,
+    nssfEmployer13Pesewas: calc.nssfEmployer13Pesewas,
+    tier1SsnitPesewas: calc.tier1SsnitPesewas,
+    tier2PetraPesewas: calc.tier2PetraPesewas,
+    hrCostPesewas: calc.hrCostPesewas,
+    seniorityLevel: calc.seniorityLevel,
+    basicSalaryPesewas: calc.basicSalaryPesewas,
+    allowancesPesewas: calc.allowancesPesewas,
+    overtimePayPesewas: calc.overtimePayPesewas,
+    grossPayPesewas: calc.grossPayPesewas,
+    ssnitEmployeePesewas: calc.ssnitEmployeePesewas,
+    ssnitEmployerPesewas: calc.ssnitEmployerPesewas,
+    chargeableIncomePesewas: calc.chargeableIncomePesewas,
+    payePesewas: calc.payePesewas,
+    ewaRecoveryPesewas: calc.ewaRecoveryPesewas,
+    totalDeductionsPesewas: calc.totalDeductionsPesewas,
+    netPayPesewas: calc.netPayPesewas,
+    status: "Pending",
+    hasOpenAnomaly: false,
+    anomalyCount: 0,
+  };
+}
+
+function recalcRunTotals(runId: string) {
+  const run = store.runs.find((r) => r.id === runId);
+  const recs = store.recordsByRun[runId];
+  if (!run || !recs) return;
+
+  run.employeeCount = recs.length;
+  run.totalBasicPesewas = recs.reduce((s, r) => s + r.basicSalaryPesewas, 0);
+  run.totalAllowancesPesewas = recs.reduce((s, r) => s + r.allowancesPesewas, 0);
+  run.totalOvertimePesewas = recs.reduce((s, r) => s + r.overtimePayPesewas, 0);
+  run.totalGrossPesewas = recs.reduce((s, r) => s + r.grossPayPesewas, 0);
+  run.totalSsnitEmployeePesewas = recs.reduce((s, r) => s + r.ssnitEmployeePesewas, 0);
+  run.totalSsnitEmployerPesewas = recs.reduce((s, r) => s + r.ssnitEmployerPesewas, 0);
+  run.totalPayePesewas = recs.reduce((s, r) => s + r.payePesewas, 0);
+  run.totalStatutoryPesewas = run.totalSsnitEmployeePesewas + run.totalPayePesewas;
+  run.totalOtherDeductionBeforeTaxPesewas = recs.reduce(
+    (s, r) => s + (r.otherDeductionBeforeTaxPesewas ?? 0),
+    0
+  );
+  run.totalEwaRecoveryPesewas = recs.reduce((s, r) => s + r.ewaRecoveryPesewas, 0);
+  run.totalNetPesewas = recs.reduce((s, r) => s + r.netPayPesewas, 0);
+  run.totalPayrollCostPesewas = run.totalGrossPesewas + run.totalSsnitEmployerPesewas;
+}
+
 export function addEmployee(params: {
   employee: Omit<Employee, "id" | "fullName">;
   actorName: string;
@@ -222,6 +409,28 @@ export function addEmployee(params: {
   };
 
   store.employees = [created, ...store.employees];
+
+  // Add a live demo login/role-switcher account for this newly created employee
+  const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "EM";
+  const newUser: User = {
+    id: `usr-${created.id}`,
+    email: created.email,
+    name: created.fullName,
+    role: "Employee",
+    employeeId: created.id,
+    department: created.department,
+    avatarInitials: initials,
+  };
+  store.users = [...store.users, newUser];
+
+  // Immediately calculate and add to active November 2026 Payroll Run
+  const activeRunId = "run-2026-11";
+  const newRec = buildPayrollRecordForEmployee(created, activeRunId);
+  store.recordsByRun[activeRunId] = [
+    newRec,
+    ...(store.recordsByRun[activeRunId] ?? []),
+  ];
+  recalcRunTotals(activeRunId);
 
   store.auditTrail.unshift({
     id: `aud-${Date.now()}`,
@@ -280,6 +489,29 @@ export function bulkAddEmployees(params: {
 
   if (added.length > 0) {
     store.employees = [...added, ...store.employees];
+
+    const newUsers: User[] = added.map((emp) => ({
+      id: `usr-${emp.id}`,
+      email: emp.email,
+      name: emp.fullName,
+      role: "Employee",
+      employeeId: emp.id,
+      department: emp.department,
+      avatarInitials:
+        `${emp.firstName.charAt(0)}${emp.lastName.charAt(0)}`.toUpperCase() || "EM",
+    }));
+    store.users = [...store.users, ...newUsers];
+
+    const activeRunId = "run-2026-11";
+    const newRecords = added.map((emp) =>
+      buildPayrollRecordForEmployee(emp, activeRunId)
+    );
+    store.recordsByRun[activeRunId] = [
+      ...newRecords,
+      ...(store.recordsByRun[activeRunId] ?? []),
+    ];
+    recalcRunTotals(activeRunId);
+
     store.auditTrail.unshift({
       id: `aud-${Date.now()}`,
       timestamp: new Date().toISOString(),
@@ -313,6 +545,16 @@ export function removeEmployee(params: {
   }
 
   store.employees = store.employees.filter((e) => e.id !== params.employeeId);
+  store.users = store.users.filter((u) => u.employeeId !== params.employeeId);
+
+  // Also remove from active November 2026 Payroll Run and update totals
+  const activeRunId = "run-2026-11";
+  if (store.recordsByRun[activeRunId]) {
+    store.recordsByRun[activeRunId] = store.recordsByRun[activeRunId].filter(
+      (r) => r.employeeId !== params.employeeId
+    );
+    recalcRunTotals(activeRunId);
+  }
 
   store.auditTrail.unshift({
     id: `aud-${Date.now()}`,
@@ -1071,6 +1313,342 @@ export function sendHrPayrollEmail(params: {
 
   notify();
   return entry;
+}
+
+// --- Leave Applications & Live Payroll Impact ---
+export const LEAVE_ENTITLEMENTS = {
+  annualDays: 15, // 15 working days / year (Paid)
+  sickDays: 12, // 12 days / year (Paid)
+  maternityDays: 60, // 3 months (~60 working days) / year (Paid)
+};
+
+export function isLeaveTypePaid(leaveType: LeaveType): boolean {
+  return leaveType !== "Casual Leave";
+}
+
+export function getLeaveRequests(employeeId?: string): LeaveRequest[] {
+  if (!employeeId) return store.leaveRequests;
+  return store.leaveRequests.filter((r) => r.employeeId === employeeId);
+}
+
+export function getEmployeeLeaveBalances(employeeId: string): EmployeeLeaveBalances {
+  const approved = store.leaveRequests.filter(
+    (r) => r.employeeId === employeeId && r.status === "Approved"
+  );
+  const sumByType = (t: LeaveType) =>
+    approved
+      .filter((r) => r.leaveType === t)
+      .reduce((acc, r) => acc + r.durationDays, 0);
+
+  const annualUsedDays = sumByType("Annual Leave");
+  const sickUsedDays = sumByType("Sick Leave");
+  const maternityUsedDays = sumByType("Maternity Leave");
+  const casualUsedDays = sumByType("Casual Leave");
+  const workInjuryUsedDays = sumByType("Work Injury Leave");
+
+  return {
+    annualEntitlementDays: LEAVE_ENTITLEMENTS.annualDays,
+    annualUsedDays,
+    annualRemainingDays: Math.max(0, LEAVE_ENTITLEMENTS.annualDays - annualUsedDays),
+    sickEntitlementDays: LEAVE_ENTITLEMENTS.sickDays,
+    sickUsedDays,
+    sickRemainingDays: Math.max(0, LEAVE_ENTITLEMENTS.sickDays - sickUsedDays),
+    maternityEntitlementDays: LEAVE_ENTITLEMENTS.maternityDays,
+    maternityUsedDays,
+    maternityRemainingDays: Math.max(
+      0,
+      LEAVE_ENTITLEMENTS.maternityDays - maternityUsedDays
+    ),
+    casualUsedDays,
+    workInjuryUsedDays,
+  };
+}
+
+export function submitLeaveRequest(params: {
+  employeeId: string;
+  leaveType: LeaveType;
+  applicationMode: "All day" | "Half day";
+  startDate: string;
+  endDate: string;
+  durationDays: number;
+  reason: string;
+  attachmentName?: string;
+  actorRole: Role;
+}): { ok: boolean; request?: LeaveRequest; error?: string } {
+  const emp = store.employees.find((e) => e.id === params.employeeId);
+  if (!emp) {
+    return { ok: false, error: "Employee profile not found." };
+  }
+  if (params.durationDays <= 0) {
+    return { ok: false, error: "Leave duration must be greater than 0 days." };
+  }
+
+  const balances = getEmployeeLeaveBalances(emp.id);
+  if (
+    params.leaveType === "Annual Leave" &&
+    params.durationDays > balances.annualRemainingDays
+  ) {
+    return {
+      ok: false,
+      error: `Requested ${params.durationDays} day(s) exceeds your remaining Annual Leave balance of ${balances.annualRemainingDays} day(s).`,
+    };
+  }
+  if (
+    params.leaveType === "Sick Leave" &&
+    params.durationDays > balances.sickRemainingDays
+  ) {
+    return {
+      ok: false,
+      error: `Requested ${params.durationDays} day(s) exceeds your remaining Sick Leave balance of ${balances.sickRemainingDays} day(s).`,
+    };
+  }
+  if (
+    params.leaveType === "Maternity Leave" &&
+    params.durationDays > balances.maternityRemainingDays
+  ) {
+    return {
+      ok: false,
+      error: `Requested ${params.durationDays} day(s) exceeds your remaining Maternity Leave balance of ${balances.maternityRemainingDays} day(s).`,
+    };
+  }
+
+  const request: LeaveRequest = {
+    id: `lv-${Date.now()}`,
+    employeeId: emp.id,
+    staffId: emp.staffId,
+    employeeName: emp.fullName,
+    department: emp.department,
+    leaveType: params.leaveType,
+    applicationMode: params.applicationMode,
+    startDate: params.startDate,
+    endDate: params.endDate,
+    durationDays: params.durationDays,
+    reason: params.reason.trim(),
+    attachmentName: params.attachmentName || undefined,
+    isPaid: isLeaveTypePaid(params.leaveType),
+    status: "Pending",
+    submittedAt: new Date().toISOString(),
+  };
+
+  store.leaveRequests = [request, ...store.leaveRequests];
+
+  store.auditTrail.unshift({
+    id: `aud-${Date.now()}`,
+    timestamp: request.submittedAt,
+    actorName: emp.fullName,
+    actorRole: params.actorRole,
+    category: "Leave",
+    action: `Submitted ${request.leaveType} Request`,
+    details: `${emp.fullName} (${emp.staffId}) requested ${request.durationDays} day(s) of ${request.leaveType} (${request.startDate} to ${request.endDate}) — ${
+      request.isPaid ? "Paid Leave" : "Unpaid Leave"
+    }.`,
+  });
+
+  notify();
+  return { ok: true, request };
+}
+
+export function reviewLeaveRequest(params: {
+  requestId: string;
+  decision: "Approved" | "Rejected";
+  reviewerName: string;
+  reviewerRole: Role;
+  comment?: string;
+}): {
+  ok: boolean;
+  request?: LeaveRequest;
+  updatedPayrollRecord?: PayrollRecord;
+  error?: string;
+} {
+  const idx = store.leaveRequests.findIndex((r) => r.id === params.requestId);
+  if (idx === -1) return { ok: false, error: "Leave request not found." };
+
+  const existing = store.leaveRequests[idx];
+  if (existing.status !== "Pending") {
+    return { ok: false, error: "This leave request has already been reviewed." };
+  }
+
+  const reviewed: LeaveRequest = {
+    ...existing,
+    status: params.decision,
+    reviewedBy: params.reviewerName,
+    reviewedByRole: params.reviewerRole,
+    reviewedAt: new Date().toISOString(),
+    reviewComment: params.comment?.trim() || undefined,
+  };
+
+  store.leaveRequests = store.leaveRequests.map((r, i) =>
+    i === idx ? reviewed : r
+  );
+
+  let updatedPayrollRecord: PayrollRecord | undefined;
+
+  // When approved, immediately apply leave days to the active Nov 2026 payroll run
+  // using Sunda Ghana's exact Excel formulas!
+  if (params.decision === "Approved") {
+    const runId = "run-2026-11";
+    const records = store.recordsByRun[runId];
+    const run = store.runs.find((r) => r.id === runId);
+    const emp = store.employees.find((e) => e.id === reviewed.employeeId);
+
+    if (records && emp) {
+      const recIdx = records.findIndex((r) => r.employeeId === reviewed.employeeId);
+      if (recIdx !== -1) {
+        const rec = records[recIdx];
+        const casualLeaveDays =
+          (rec.casualLeaveDays ?? 0) +
+          (reviewed.leaveType === "Casual Leave" ? reviewed.durationDays : 0);
+        const absentDays = rec.absentDays ?? 0;
+        const sickLeaveDays =
+          (rec.sickLeaveDays ?? 0) +
+          (reviewed.leaveType === "Sick Leave" ? reviewed.durationDays : 0);
+        const annualLeaveDays =
+          (rec.annualLeaveDays ?? 0) +
+          (reviewed.leaveType === "Annual Leave" ? reviewed.durationDays : 0);
+        const maternityLeaveDays =
+          (rec.maternityLeaveDays ?? 0) +
+          (reviewed.leaveType === "Maternity Leave" ? reviewed.durationDays : 0);
+        const workInjuryLeaveDays =
+          (rec.workInjuryLeaveDays ?? 0) +
+          (reviewed.leaveType === "Work Injury Leave" ? reviewed.durationDays : 0);
+
+        const isExcelRow =
+          rec.staffId === "100001" ||
+          rec.staffId === "100002" ||
+          rec.staffId === "100003";
+
+        const recalc = calculateSundaExcelPayroll({
+          basicSalaryPesewas: emp.basicSalaryPesewas,
+          positionStdPesewas:
+            rec.positionStdPesewas ?? emp.positionStdPesewas ?? emp.transportAllowancePesewas,
+          performanceStdPesewas:
+            rec.performanceStdPesewas ?? emp.performanceStdPesewas ?? emp.housingAllowancePesewas,
+          seniorityLevel: rec.seniorityLevel ?? emp.seniorityLevel ?? "Seniors",
+          shouldWorkingDays: rec.daysExpected || 20,
+          casualLeaveDays,
+          absentDays,
+          sickLeaveDays,
+          annualLeaveDays,
+          maternityLeaveDays,
+          workInjuryLeaveDays,
+          coefficientScore: rec.coefficientScore ?? 1.0,
+          otherIncomePesewas: rec.otherIncomePesewas ?? 0,
+          otherDeductionBeforeTaxPesewas: rec.otherDeductionBeforeTaxPesewas ?? 0,
+          fullAttendanceBonusPesewas: rec.fullAttendanceBonusPesewas ?? 0,
+          lunchAllowancePesewas: rec.lunchAllowancePesewas ?? 0,
+          workdayOtHours: rec.workdayOtHours ?? 0,
+          saturdayOtHours: rec.saturdayOtHours ?? 0,
+          sundayOtHours: rec.sundayOtHours ?? 0,
+          holidayOtHours: rec.holidayOtHours ?? 0,
+          ewaRecoveryPesewas: rec.ewaRecoveryPesewas,
+          useExcelPayeBands: isExcelRow,
+          rules: store.rules,
+          periodMonth: run?.periodMonth ?? "2026-11",
+        });
+
+        updatedPayrollRecord = {
+          ...rec,
+          daysExpected: recalc.daysExpected,
+          daysAttended: recalc.daysAttended,
+          daysPaid: recalc.daysPaid,
+          casualLeaveDays: recalc.casualLeaveDays,
+          absentDays: recalc.absentDays,
+          sickLeaveDays: recalc.sickLeaveDays,
+          annualLeaveDays: recalc.annualLeaveDays,
+          maternityLeaveDays: recalc.maternityLeaveDays,
+          workInjuryLeaveDays: recalc.workInjuryLeaveDays,
+          positionEarnedPesewas: recalc.positionEarnedPesewas,
+          performanceEarnedPesewas: recalc.performanceEarnedPesewas,
+          totalBonusPesewas: recalc.totalBonusPesewas,
+          bonusTaxBasePesewas: recalc.bonusTaxBasePesewas,
+          bonusTaxPesewas: recalc.bonusTaxPesewas,
+          otTaxBasePesewas: recalc.otTaxBasePesewas,
+          otTaxPesewas: recalc.otTaxPesewas,
+          cashAllowancePesewas: recalc.cashAllowancePesewas,
+          excessBonusPesewas: recalc.excessBonusPesewas,
+          payeBasePesewas: recalc.payeBasePesewas,
+          totalGraTaxPesewas: recalc.totalGraTaxPesewas,
+          nssfEmployer13Pesewas: recalc.nssfEmployer13Pesewas,
+          tier1SsnitPesewas: recalc.tier1SsnitPesewas,
+          tier2PetraPesewas: recalc.tier2PetraPesewas,
+          hrCostPesewas: recalc.hrCostPesewas,
+          basicSalaryPesewas: recalc.basicSalaryPesewas,
+          allowancesPesewas: recalc.allowancesPesewas,
+          overtimePayPesewas: recalc.overtimePayPesewas,
+          grossPayPesewas: recalc.grossPayPesewas,
+          ssnitEmployeePesewas: recalc.ssnitEmployeePesewas,
+          ssnitEmployerPesewas: recalc.ssnitEmployerPesewas,
+          chargeableIncomePesewas: recalc.chargeableIncomePesewas,
+          payePesewas: recalc.payePesewas,
+          totalDeductionsPesewas: recalc.totalDeductionsPesewas,
+          netPayPesewas: recalc.netPayPesewas,
+        };
+
+        const updatedRecords = records.map((r, i) =>
+          i === recIdx ? updatedPayrollRecord! : r
+        );
+        store.recordsByRun[runId] = updatedRecords;
+
+        if (run) {
+          run.totalBasicPesewas = updatedRecords.reduce(
+            (s, r) => s + r.basicSalaryPesewas,
+            0
+          );
+          run.totalAllowancesPesewas = updatedRecords.reduce(
+            (s, r) => s + r.allowancesPesewas,
+            0
+          );
+          run.totalOvertimePesewas = updatedRecords.reduce(
+            (s, r) => s + r.overtimePayPesewas,
+            0
+          );
+          run.totalGrossPesewas = updatedRecords.reduce(
+            (s, r) => s + r.grossPayPesewas,
+            0
+          );
+          run.totalSsnitEmployeePesewas = updatedRecords.reduce(
+            (s, r) => s + r.ssnitEmployeePesewas,
+            0
+          );
+          run.totalSsnitEmployerPesewas = updatedRecords.reduce(
+            (s, r) => s + r.ssnitEmployerPesewas,
+            0
+          );
+          run.totalPayePesewas = updatedRecords.reduce(
+            (s, r) => s + r.payePesewas,
+            0
+          );
+          run.totalStatutoryPesewas =
+            run.totalSsnitEmployeePesewas + run.totalPayePesewas;
+          run.totalNetPesewas = updatedRecords.reduce(
+            (s, r) => s + r.netPayPesewas,
+            0
+          );
+          run.totalPayrollCostPesewas =
+            run.totalGrossPesewas + run.totalSsnitEmployerPesewas;
+        }
+      }
+    }
+  }
+
+  store.auditTrail.unshift({
+    id: `aud-${Date.now()}`,
+    timestamp: reviewed.reviewedAt!,
+    actorName: params.reviewerName,
+    actorRole: params.reviewerRole,
+    category: "Leave",
+    action: `${params.decision} ${reviewed.leaveType} Request`,
+    details: `${params.decision} ${reviewed.durationDays} day(s) of ${reviewed.leaveType} for ${reviewed.employeeName} (${reviewed.staffId}).${
+      updatedPayrollRecord
+        ? ` Nov 2026 payroll recalculated: Actual ${updatedPayrollRecord.daysAttended}/${updatedPayrollRecord.daysExpected} days, Paid ${updatedPayrollRecord.daysPaid} days, Net Pay GHS ${(
+            updatedPayrollRecord.netPayPesewas / 100
+          ).toFixed(2)}.`
+        : ""
+    }`,
+  });
+
+  notify();
+  return { ok: true, request: reviewed, updatedPayrollRecord };
 }
 
 // --- Audit Trail & Department Overtime ---

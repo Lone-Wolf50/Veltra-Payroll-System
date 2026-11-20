@@ -214,8 +214,12 @@ export function buildInitialPayrollData(employees: Employee[] = INITIAL_EMPLOYEE
         string,
         {
           shouldWorkingDays: number;
-          actualWorkingDays: number;
-          paidDays: number;
+          casualLeaveDays: number;
+          absentDays: number;
+          sickLeaveDays: number;
+          annualLeaveDays: number;
+          maternityLeaveDays: number;
+          workInjuryLeaveDays: number;
           coefficientScore: number;
           otherIncomePesewas: number;
           fullAttendanceBonusPesewas: number;
@@ -228,8 +232,12 @@ export function buildInitialPayrollData(employees: Employee[] = INITIAL_EMPLOYEE
       > = {
         "100001": {
           shouldWorkingDays: 20,
-          actualWorkingDays: 20,
-          paidDays: 20,
+          casualLeaveDays: 0,
+          absentDays: 0,
+          sickLeaveDays: 0,
+          annualLeaveDays: 10,
+          maternityLeaveDays: 10,
+          workInjuryLeaveDays: 0,
           coefficientScore: 1.5,
           otherIncomePesewas: 152120, // GHS 1,521.20 (Leave pay 320 + Key Pos 150 + Prod Inc 600 + Overprod 451.20)
           fullAttendanceBonusPesewas: 20000, // GHS 200.00
@@ -241,8 +249,12 @@ export function buildInitialPayrollData(employees: Employee[] = INITIAL_EMPLOYEE
         },
         "100002": {
           shouldWorkingDays: 20,
-          actualWorkingDays: 19,
-          paidDays: 20,
+          casualLeaveDays: 0,
+          absentDays: 0,
+          sickLeaveDays: 0,
+          annualLeaveDays: 1,
+          maternityLeaveDays: 0,
+          workInjuryLeaveDays: 0,
           coefficientScore: 1.0,
           otherIncomePesewas: 34500, // GHS 345.00 (Leave pay 345)
           fullAttendanceBonusPesewas: 10000, // GHS 100.00
@@ -254,8 +266,12 @@ export function buildInitialPayrollData(employees: Employee[] = INITIAL_EMPLOYEE
         },
         "100003": {
           shouldWorkingDays: 20,
-          actualWorkingDays: 20,
-          paidDays: 20,
+          casualLeaveDays: 0,
+          absentDays: 5,
+          sickLeaveDays: 2,
+          annualLeaveDays: 0,
+          maternityLeaveDays: 0,
+          workInjuryLeaveDays: 0,
           coefficientScore: 2.0,
           otherIncomePesewas: 21200, // GHS 212.00 (Leave pay 162 + Key Pos 50)
           fullAttendanceBonusPesewas: 16000, // GHS 160.00
@@ -307,8 +323,12 @@ export function buildInitialPayrollData(employees: Employee[] = INITIAL_EMPLOYEE
           performanceStdPesewas: emp.performanceStdPesewas ?? 0,
           seniorityLevel: emp.seniorityLevel ?? "Seniors",
           shouldWorkingDays: excelSpec.shouldWorkingDays,
-          actualWorkingDays: excelSpec.actualWorkingDays,
-          paidDays: excelSpec.paidDays,
+          casualLeaveDays: excelSpec.casualLeaveDays,
+          absentDays: excelSpec.absentDays,
+          sickLeaveDays: excelSpec.sickLeaveDays,
+          annualLeaveDays: excelSpec.annualLeaveDays,
+          maternityLeaveDays: excelSpec.maternityLeaveDays,
+          workInjuryLeaveDays: excelSpec.workInjuryLeaveDays,
           coefficientScore: excelSpec.coefficientScore,
           otherIncomePesewas: excelSpec.otherIncomePesewas,
           otherDeductionBeforeTaxPesewas: 0,
@@ -335,6 +355,15 @@ export function buildInitialPayrollData(employees: Employee[] = INITIAL_EMPLOYEE
         calc = {
           ...stdCalc,
           seniorityLevel: "Seniors",
+          daysExpected: 20,
+          daysAttended: 20,
+          daysPaid: 20,
+          casualLeaveDays: 0,
+          absentDays: 0,
+          sickLeaveDays: 0,
+          annualLeaveDays: 0,
+          maternityLeaveDays: 0,
+          workInjuryLeaveDays: 0,
           dailyWageStdPesewas: Math.round(emp.basicSalaryPesewas / 20),
           hourlyWageStdPesewas: Math.round(emp.basicSalaryPesewas / 160),
           positionStdPesewas: 0,
@@ -421,10 +450,15 @@ export function buildInitialPayrollData(employees: Employee[] = INITIAL_EMPLOYEE
         department: emp.department,
         jobTitle: emp.jobTitle,
         employeeStatus: emp.status,
-        daysExpected: excelSpec?.shouldWorkingDays ?? 20,
-        daysAttended:
-          excelSpec?.actualWorkingDays ?? anomalySpec?.daysAttendedOverride ?? 20,
-        daysPaid: excelSpec?.paidDays ?? anomalySpec?.daysPaidOverride ?? 20,
+        daysExpected: calc.daysExpected,
+        daysAttended: calc.daysAttended,
+        daysPaid: calc.daysPaid,
+        casualLeaveDays: calc.casualLeaveDays,
+        absentDays: calc.absentDays,
+        sickLeaveDays: calc.sickLeaveDays,
+        annualLeaveDays: calc.annualLeaveDays,
+        maternityLeaveDays: calc.maternityLeaveDays,
+        workInjuryLeaveDays: calc.workInjuryLeaveDays,
         overtimeHours,
         workdayOtHours: calc.workdayOtHours,
         saturdayOtHours: calc.saturdayOtHours,

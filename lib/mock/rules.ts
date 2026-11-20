@@ -81,10 +81,12 @@ export const INITIAL_SYSTEM_RULES: SystemRules = {
  *    - Daily Wage STD = Basic Wage STD / Should Working Days (default 20)
  *    - Hourly Wage STD = Daily Wage STD / 8
  *
- * 2. Earned Wages & Bonus:
- *    - Basic Wage Earned = Basic Wage STD * (Paid Days / Should Working Days)
- *    - Position Earned = Position STD
- *    - Performance Earned = Performance STD * (Coefficient Score / 100)
+ * 2. Earned Wages & Bonus (with Unpaid vs Paid Leave):
+ *    - Paid Days = Should Working Days - Casual Leave Days - Absent Days
+ *    - Actual Working Days = Should Working Days - Casual - Absent - Sick - Annual - Maternity - Work Injury
+ *    - Basic Wage Earned = ROUND(Basic Wage STD * (Should - Casual - Absent) / Should, 2)
+ *    - Position Earned = ROUND(Position STD * (Should - Casual - Absent) / Should, 2)
+ *    - Performance Earned = ROUND(Performance STD * (Should - Casual - Absent) / Should * (Coefficient / 100), 2)
  *    - Overproduction Allowance = Basic Wage STD * Overproduction Coefficient
  *    - Total Bonus = Position Earned + Performance Earned + Other Income (before tax) + Full Attendance + Lunch Allowance
  *
@@ -121,6 +123,12 @@ export function calculateSundaExcelPayroll(params: {
   shouldWorkingDays?: number;
   actualWorkingDays?: number;
   paidDays?: number;
+  casualLeaveDays?: number; // Unpaid leave
+  absentDays?: number; // Unexcused absence from clock-in
+  sickLeaveDays?: number; // Paid (12 days/yr)
+  annualLeaveDays?: number; // Paid (15 working days/yr)
+  maternityLeaveDays?: number; // Paid (3 months/yr)
+  workInjuryLeaveDays?: number; // Paid (indefinite)
   coefficientScore?: number; // e.g. 1.5, 1.0, 2.0
   otherIncomePesewas?: number; // Leave pay, key position, production incentive, overproduction allowance
   otherDeductionBeforeTaxPesewas?: number; // Pre-tax deductions (e.g. unpaid leave / salary adjustment / pre-tax deduction)
@@ -137,7 +145,39 @@ export function calculateSundaExcelPayroll(params: {
 }) {
   const rules = params.rules ?? INITIAL_SYSTEM_RULES;
   const shouldDays = params.shouldWorkingDays ?? 20;
-  const paidDays = params.paidDays ?? shouldDays;
+  const casualLeaveDays = params.casualLeaveDays ?? 0;
+  const absentDays = params.absentDays ?? 0;
+  const sickLeaveDays = params.sickLeaveDays ?? 0;
+  const annualLeaveDays = params.annualLeaveDays ?? 0;
+  const maternityLeaveDays = params.maternityLeaveDays ?? 0;
+  const workInjuryLeaveDays = params.workInjuryLeaveDays ?? 0;
+
+  const hasLeaveBreakdown =
+    params.casualLeaveDays !== undefined ||
+    params.absentDays !== undefined ||
+    params.sickLeaveDays !== undefined ||
+    params.annualLeaveDays !== undefined ||
+    params.maternityLeaveDays !== undefined ||
+    params.workInjuryLeaveDays !== undefined;
+
+  const paidDays = hasLeaveBreakdown
+    ? Math.max(0, shouldDays - casualLeaveDays - absentDays)
+    : params.paidDays ?? shouldDays;
+
+  const actualWorkingDays = hasLeaveBreakdown
+    ? Math.max(
+        0,
+        shouldDays -
+          casualLeaveDays -
+          absentDays -
+          sickLeaveDays -
+          annualLeaveDays -
+          maternityLeaveDays -
+          workInjuryLeaveDays
+      )
+    : params.actualWorkingDays ?? paidDays;
+
+  const payRatio = shouldDays > 0 ? paidDays / shouldDays : 0;
   const seniority = params.seniorityLevel ?? "Seniors";
 
   const basicStdCedis = params.basicSalaryPesewas / 100;
@@ -148,12 +188,15 @@ export function calculateSundaExcelPayroll(params: {
   const dailyWageStdCedis = basicStdCedis / shouldDays;
   const hourlyWageStdCedis = dailyWageStdCedis / 8;
 
-  const basicEarnedCedis = basicStdCedis * (paidDays / shouldDays);
-  const positionEarnedCedis = positionStdCedis;
+  // Exact Sunda Excel Formulas:
+  // Basic Earned = ROUND(Basic STD * (Should - Casual - Absent) / Should, 2)
+  // Position Earned = ROUND(Position STD * (Should - Casual - Absent) / Should, 2)
+  // Performance Earned = ROUND(Performance STD * (Should - Casual - Absent) / Should * (Coefficient / 100), 2)
+  const basicEarnedCedis = Math.round(basicStdCedis * payRatio * 100) / 100;
+  const positionEarnedCedis = Math.round(positionStdCedis * payRatio * 100) / 100;
   const coeff = params.coefficientScore ?? 1.0;
-  // Performance Earned = Performance STD * Coefficient Score (e.g. 1,446 * 1.5 = 2,169.00)
   const performanceEarnedCedis =
-    Math.round(performanceStdCedis * coeff * 100) / 100;
+    Math.round(performanceStdCedis * payRatio * coeff * 100) / 100;
 
   const otherIncomeCedis = (params.otherIncomePesewas ?? 0) / 100;
   const otherDeductionBeforeTaxCedis = (params.otherDeductionBeforeTaxPesewas ?? 0) / 100;
@@ -295,6 +338,15 @@ export function calculateSundaExcelPayroll(params: {
     netPayPesewas: toP(netPayCedis),
     // Detailed Excel formula fields
     seniorityLevel: seniority,
+    daysExpected: shouldDays,
+    daysAttended: actualWorkingDays,
+    daysPaid: paidDays,
+    casualLeaveDays,
+    absentDays,
+    sickLeaveDays,
+    annualLeaveDays,
+    maternityLeaveDays,
+    workInjuryLeaveDays,
     dailyWageStdPesewas: toP(dailyWageStdCedis),
     hourlyWageStdPesewas: toP(hourlyWageStdCedis),
     positionStdPesewas: toP(positionStdCedis),

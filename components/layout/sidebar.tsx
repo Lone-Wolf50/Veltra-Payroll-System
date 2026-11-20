@@ -17,12 +17,13 @@ import {
   History,
   Settings,
   Mail,
+  CalendarDays,
   X,
 } from "lucide-react";
 import { VeltraLogo } from "@/components/ui/logo";
 import { useAuth } from "@/components/providers/auth-provider";
 import { getVisibleNavItems, NavItemConfig } from "@/lib/roles";
-import { getAnomalies } from "@/lib/data";
+import { getAnomalies, getLeaveRequests } from "@/lib/data";
 import { cn } from "@/lib/utils";
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -39,6 +40,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   History,
   Settings,
   Mail,
+  CalendarDays,
 };
 
 export function Sidebar({
@@ -54,6 +56,10 @@ export function Sidebar({
   const openAnomalyCount = getAnomalies("run-2026-11").filter(
     (a) => a.status === "Needs review"
   ).length;
+  const pendingLeaveCount =
+    user.role === "Supervisor" || user.role === "HR/Payroll"
+      ? getLeaveRequests().filter((l) => l.status === "Pending").length
+      : 0;
 
   const isItemActive = (item: NavItemConfig) => {
     if (item.href === "/dashboard") return pathname === "/dashboard";
@@ -148,6 +154,17 @@ export function Sidebar({
                     className="rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums"
                   >
                     {openAnomalyCount}
+                  </span>
+                )}
+                {item.id === "leave" && pendingLeaveCount > 0 && (
+                  <span
+                    style={{
+                      backgroundColor: "var(--status-amber-bg)",
+                      color: "var(--status-amber-fg)",
+                    }}
+                    className="rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums"
+                  >
+                    {pendingLeaveCount}
                   </span>
                 )}
                 {perm === "view" && (

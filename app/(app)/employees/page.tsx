@@ -489,8 +489,8 @@ export default function EmployeesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="min-w-0">
           <h1 className="text-[28px] font-bold tracking-tight text-text leading-tight">
             {isAdmin
               ? "Contract Letters Issuing & Personnel Filing"
@@ -503,8 +503,8 @@ export default function EmployeesPage() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          <div className="relative w-full sm:w-64">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 sm:shrink-0">
+          <div className="relative w-full sm:w-56">
             <label htmlFor="emp-dir-search" className="sr-only">
               Search employees
             </label>
